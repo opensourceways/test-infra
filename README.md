@@ -4,6 +4,8 @@
 [![GoDoc](https://godoc.org/github.com/kubernetes/test-infra?status.svg)](https://godoc.org/github.com/kubernetes/test-infra)
 [![Build status](https://prow.k8s.io/badge.svg?jobs=post-test-infra-bazel)](https://testgrid.k8s.io/sig-testing-misc#post-bazel)
 
+This repository was forked from [k8s test-infra](https://github.com/kubernetes/test-infra). Thanks for their work! This repository is aimed to change prow to work on more git providers such as gitee.
+
 This repository contains tools and configuration files for the testing and
 automation needs of the Kubernetes project.
 
