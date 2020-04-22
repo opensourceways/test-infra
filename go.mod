@@ -18,6 +18,7 @@ replace (
 
 require (
 	cloud.google.com/go v0.47.0
+	gitee.com/openeuler/go-gitee v0.0.0-20200421085606-b5c14af251af
 	github.com/Azure/azure-sdk-for-go v38.0.0+incompatible
 	github.com/Azure/azure-storage-blob-go v0.8.0
 	github.com/Azure/go-autorest/autorest v0.9.6
@@ -25,6 +26,7 @@ require (
 	github.com/GoogleCloudPlatform/testgrid v0.0.7
 	github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
 	github.com/andygrunwald/go-gerrit v0.0.0-20190120104749-174420ebee6c
+	github.com/antihax/optional v1.0.0
 	github.com/aws/aws-k8s-tester v1.0.0
 	github.com/aws/aws-sdk-go v1.30.5
 	github.com/bazelbuild/buildtools v0.0.0-20190917191645-69366ca98f89
