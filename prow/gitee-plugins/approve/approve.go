@@ -23,8 +23,10 @@ const (
 	lgtmCommand    = "LGTM"
 )
 
+type GetPluginConfig func(string) plugins.PluginConfig
+
 type approve struct {
-	getPluginConfig plugins.GetPluginConfig
+	getPluginConfig GetPluginConfig
 	ghc             githubClient
 	oc              ownersClient
 }
@@ -48,7 +50,7 @@ type ownersClient interface {
 	LoadRepoOwners(org, repo, base string) (repoowners.RepoOwner, error)
 }
 
-func NewApprove(f plugins.GetPluginConfig, ghc githubClient, oc ownersClient) plugins.Plugin {
+func NewApprove(f GetPluginConfig, ghc githubClient, oc ownersClient) *approve {
 	return &approve{
 		getPluginConfig: f,
 		ghc:             ghc,
@@ -80,12 +82,6 @@ func (a *approve) NewPluginConfig() plugins.PluginConfig {
 	return &configuration{}
 }
 
-func (a *approve) RegisterEventHandler(p plugins.Plugins) {
-	name := a.PluginName()
-	p.RegisterNoteEventHandler(name, a.handleNoteEvent)
-	p.RegisterPullRequestHandler(name, a.handlePullRequestEvent)
-}
-
 func isApprovalCommand(botName, author, comment string, lgtmActsAsApprove bool) bool {
 	if author == botName {
 		return false
@@ -102,7 +98,7 @@ func isApprovalCommand(botName, author, comment string, lgtmActsAsApprove bool) 
 	return false
 }
 
-func (a *approve) handleNoteEvent(e *gitee.NoteEvent, log *logrus.Entry) error {
+func (a *approve) HandleNoteEvent(e *gitee.NoteEvent, log *logrus.Entry) error {
 	funcStart := time.Now()
 	defer func() {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
@@ -160,7 +156,7 @@ func (a *approve) handle(org, repo string, pr *gitee.PullRequestHook, log *logru
 	)
 }
 
-func (a *approve) handlePullRequestEvent(e *gitee.PullRequestEvent, log *logrus.Entry) error {
+func (a *approve) HandlePullRequestEvent(e *gitee.PullRequestEvent, log *logrus.Entry) error {
 	funcStart := time.Now()
 	defer func() {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handlePullRequest")

@@ -1,6 +1,8 @@
 package gitee
 
 import (
+	"net/http"
+
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"k8s.io/test-infra/prow/github"
 )
@@ -26,4 +28,7 @@ type Client interface {
 	AddLabel(org, repo string, number int, label string) error
 	RemoveLabel(org, repo string, number int, label string) error
 	ListIssueEvents(org, repo string, num int) ([]github.ListedIssueEvent, error)
+	GetPermission(owner, repo, username string, localVarOptionals *sdk.GetV5ReposOwnerRepoCollaboratorsUsernamePermissionOpts) (sdk.ProjectMemberPermission, error)
+	PatchIssuesNumber(owner, number string, body sdk.IssueUpdateParam) (sdk.Issue, *http.Response, error)
+	PostIssuesNumberComments(owner, repo, number string, body sdk.IssueCommentPostParam) (sdk.Note, *http.Response, error)
 }

@@ -24,8 +24,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/test-infra/prow/interrupts"
-
 	"k8s.io/test-infra/pkg/flagutil"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/config/secret"
@@ -34,7 +32,10 @@ import (
 	"k8s.io/test-infra/prow/gitee"
 	hook "k8s.io/test-infra/prow/gitee-hook"
 	plugins "k8s.io/test-infra/prow/gitee-plugins"
+	"k8s.io/test-infra/prow/gitee-plugins/approve"
+	"k8s.io/test-infra/prow/gitee-plugins/reopen"
 	originh "k8s.io/test-infra/prow/hook"
+	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/logrusutil"
 	"k8s.io/test-infra/prow/metrics"
 	"k8s.io/test-infra/prow/pjutil"
@@ -213,4 +214,19 @@ func buildClients(o *options, secretAgent *secret.Agent, pluginAgent *plugins.Co
 		ownersClient:   ownersClient,
 	}
 	return cs, nil
+}
+
+func initPlugins(agent *plugins.ConfigAgent, pm plugins.Plugins, cs *clients) {
+	getPluginConfigFunc := func(name string) plugins.PluginConfig {
+		return agent.Config().GetPluginConfig(name)
+	}
+	//plugin-approve
+	a := approve.NewApprove(getPluginConfigFunc, cs.giteeClient, cs.ownersClient)
+	pm.RegisterHelper(a.PluginName(), a.HelpProvider)
+	pm.RegisterNoteEventHandler(a.PluginName(), a.HandleNoteEvent)
+	pm.RegisterPullRequestHandler(a.PluginName(), a.HandlePullRequestEvent)
+	agent.RegisterPluginConfigBuilder(a.PluginName(), a.NewPluginConfig)
+	//plugin-reopen
+	reopen := reopen.NewReopen(getPluginConfigFunc, cs.giteeClient, cs.ownersClient)
+	pm.RegisterNoteEventHandler(reopen.GetPluginName(), reopen.HandleNoteEvent)
 }

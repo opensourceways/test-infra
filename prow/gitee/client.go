@@ -3,6 +3,7 @@ package gitee
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -270,4 +271,20 @@ func (c *client) RemoveLabel(org, repo string, number int, label string) error {
 
 func (c *client) ListIssueEvents(org, repo string, num int) ([]github.ListedIssueEvent, error) {
 	return []github.ListedIssueEvent{}, nil
+}
+
+func (c *client) GetPermission(owner, repo, username string, localVarOptionals *sdk.GetV5ReposOwnerRepoCollaboratorsUsernamePermissionOpts) (sdk.ProjectMemberPermission, error) {
+	permission, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaboratorsUsernamePermission(context.Background(), owner, repo,
+		username, localVarOptionals)
+	return permission, err
+}
+
+func (c *client) PatchIssuesNumber(owner, number string, body sdk.IssueUpdateParam) (sdk.Issue, *http.Response, error) {
+	issue, response, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(context.Background(), owner, number, body)
+	return issue, response, err
+}
+
+func (c *client) PostIssuesNumberComments(owner, repo, number string, body sdk.IssueCommentPostParam) (sdk.Note, *http.Response, error) {
+	note, response, err := c.ac.IssuesApi.PostV5ReposOwnerRepoIssuesNumberComments(context.Background(), owner, repo, number, body)
+	return note, response, err
 }
