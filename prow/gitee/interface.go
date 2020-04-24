@@ -1,6 +1,8 @@
 package gitee
 
 import (
+	"net/http"
+
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"k8s.io/test-infra/prow/github"
 )
@@ -30,4 +32,8 @@ type Client interface {
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
 
 	IsCollaborator(owner, repo, login string) (bool, error)
+	GetPermission(owner, repo, username string, localVarOptionals *sdk.GetV5ReposOwnerRepoCollaboratorsUsernamePermissionOpts) (sdk.ProjectMemberPermission, error)
+	PatchIssuesNumber(owner, number string, body sdk.IssueUpdateParam) (sdk.Issue, *http.Response, error)
+	PostIssuesNumberComments(owner, repo, number string, body sdk.IssueCommentPostParam) (sdk.Note, *http.Response, error)
+	UpdatePullRequestContext(org, repo string, number int32, body sdk.PullRequestUpdateParam) (sdk.PullRequest, *http.Response, error)
 }

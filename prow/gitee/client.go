@@ -3,6 +3,7 @@ package gitee
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -289,4 +290,25 @@ func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (c *client) GetPermission(owner, repo, username string, localVarOptionals *sdk.GetV5ReposOwnerRepoCollaboratorsUsernamePermissionOpts) (sdk.ProjectMemberPermission, error) {
+	permission, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaboratorsUsernamePermission(context.Background(), owner, repo,
+		username, localVarOptionals)
+	return permission, err
+}
+
+func (c *client) PatchIssuesNumber(owner, number string, body sdk.IssueUpdateParam) (sdk.Issue, *http.Response, error) {
+	issue, response, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(context.Background(), owner, number, body)
+	return issue, response, err
+}
+
+func (c *client) PostIssuesNumberComments(owner, repo, number string, body sdk.IssueCommentPostParam) (sdk.Note, *http.Response, error) {
+	note, response, err := c.ac.IssuesApi.PostV5ReposOwnerRepoIssuesNumberComments(context.Background(), owner, repo, number, body)
+	return note, response, err
+}
+
+func (c *client) UpdatePullRequestContext(org, repo string, number int32, body sdk.PullRequestUpdateParam) (sdk.PullRequest, *http.Response, error) {
+	pr, response, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsNumber(context.Background(), org, repo, number, body)
+	return pr, response, err
 }
