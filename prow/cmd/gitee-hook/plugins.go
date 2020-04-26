@@ -3,6 +3,7 @@ package main
 import (
 	plugins "k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/gitee-plugins/approve"
+	"k8s.io/test-infra/prow/gitee-plugins/assign"
 )
 
 func initPlugins(agent *plugins.ConfigAgent, pm plugins.Plugins, cs *clients) {
@@ -10,10 +11,16 @@ func initPlugins(agent *plugins.ConfigAgent, pm plugins.Plugins, cs *clients) {
 		return agent.Config().GetPluginConfig(name)
 	}
 
-	a := approve.NewApprove(gpc, cs.giteeClient, cs.ownersClient)
+	var v []plugins.Plugin
+	v = append(v, approve.NewApprove(gpc, cs.giteeClient, cs.ownersClient))
+	v = append(v, assign.NewAssign(gpc, cs.giteeClient))
 
-	name := a.PluginName()
-	a.RegisterEventHandler(pm)
-	pm.RegisterHelper(name, a.HelpProvider)
-	agent.RegisterPluginConfigBuilder(name, a.NewPluginConfig)
+	for _, i := range v {
+		name := i.PluginName()
+
+		i.RegisterEventHandler(pm)
+		pm.RegisterHelper(name, i.HelpProvider)
+
+		agent.RegisterPluginConfigBuilder(name, i.NewPluginConfig)
+	}
 }

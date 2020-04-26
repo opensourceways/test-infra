@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/antihax/optional"
@@ -149,10 +148,6 @@ func (c *client) GetRef(org, repo, ref string) (string, error) {
 	return b.Commit.Sha, nil
 }
 
-func (c *client) GetPullRequest(org, repo string, number int) (*github.PullRequest, error) {
-	return nil, nil
-}
-
 func (c *client) GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error) {
 	fs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberFiles(
 		context.Background(), org, repo, int32(number), nil)
@@ -168,9 +163,8 @@ func (c *client) GetPullRequestChanges(org, repo string, number int) ([]github.P
 	return r, nil
 }
 
-// actually this method return the labels of pull request not issue
-func (c *client) GetIssueLabels(org, repo string, number int) ([]github.Label, error) {
-	var r []github.Label
+func (c *client) GetPRLabels(org, repo string, number int) ([]sdk.Label, error) {
+	var r []sdk.Label
 
 	p := int32(1)
 	opt := sdk.GetV5ReposOwnerRepoPullsNumberLabelsOpts{}
@@ -188,16 +182,14 @@ func (c *client) GetIssueLabels(org, repo string, number int) ([]github.Label, e
 
 		p += 1
 
-		for _, i := range ls {
-			r = append(r, github.Label{Name: i.Name})
-		}
+		r = append(r, ls...)
 	}
 
 	return r, nil
 }
 
-func (c *client) ListIssueComments(org, repo string, number int) ([]github.IssueComment, error) {
-	var r []github.IssueComment
+func (c *client) ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error) {
+	var r []sdk.PullRequestComments
 
 	p := int32(1)
 	opt := sdk.GetV5ReposOwnerRepoPullsNumberCommentsOpts{}
@@ -214,60 +206,87 @@ func (c *client) ListIssueComments(org, repo string, number int) ([]github.Issue
 		}
 
 		p += 1
-
-		for _, i := range cs {
-			ct, _ := time.Parse(time.RFC3339, i.CreatedAt)
-			ut, _ := time.Parse(time.RFC3339, i.UpdatedAt)
-
-			cm := github.IssueComment{
-				ID:        int(i.Id),
-				Body:      i.Body,
-				User:      github.User{Login: i.User.Login},
-				HTMLURL:   i.HtmlUrl,
-				CreatedAt: ct,
-				UpdatedAt: ut,
-			}
-			r = append(r, cm)
-		}
+		r = append(r, cs...)
 	}
 
 	return r, nil
 }
 
-func (c *client) ListReviews(org, repo string, number int) ([]github.Review, error) {
-	return []github.Review{}, nil
-}
-
-func (c *client) ListPullRequestComments(org, repo string, number int) ([]github.ReviewComment, error) {
-	return []github.ReviewComment{}, nil
-}
-
-func (c *client) DeleteComment(org, repo string, ID int) error {
+func (c *client) DeletePRComment(org, repo string, ID int) error {
 	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsCommentsId(
 		context.Background(), org, repo, int32(ID), nil)
 	return err
 }
 
-func (c *client) CreateComment(org, repo string, number int, comment string) error {
+func (c *client) CreatePRComment(org, repo string, number int, comment string) error {
 	opt := sdk.PullRequestCommentPostParam{Body: comment}
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberComments(
 		context.Background(), org, repo, int32(number), opt)
 	return err
 }
 
-func (c *client) AddLabel(org, repo string, number int, label string) error {
+func (c *client) AddPRLabel(org, repo string, number int, label string) error {
 	opt := sdk.PullRequestLabelPostParam{Body: []string{label}}
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberLabels(
 		context.Background(), org, repo, int32(number), opt)
 	return err
 }
 
-func (c *client) RemoveLabel(org, repo string, number int, label string) error {
+func (c *client) RemovePRLabel(org, repo string, number int, label string) error {
 	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsLabel(
 		context.Background(), org, repo, int32(number), label, nil)
 	return err
 }
 
-func (c *client) ListIssueEvents(org, repo string, num int) ([]github.ListedIssueEvent, error) {
-	return []github.ListedIssueEvent{}, nil
+func (c *client) AssignPR(org, repo string, number int, logins []string) error {
+	opt := sdk.PullRequestAssigneePostParam{Assignees: strings.Join(logins, ",")}
+
+	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberAssignees(
+		context.Background(), org, repo, int32(number), opt)
+	return err
+}
+
+func (c *client) UnassignPR(org, repo string, number int, logins []string) error {
+	_, _, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsNumberAssignees(
+		context.Background(), org, repo, int32(number), strings.Join(logins, ","), nil)
+	return err
+}
+
+func (c *client) AssignGiteeIssue(org, repo string, number string, login string) error {
+	opt := sdk.IssueUpdateParam{
+		Repo:     repo,
+		Assignee: login,
+	}
+	_, v, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(
+		context.Background(), org, number, opt)
+
+	if err != nil {
+		if v.StatusCode == 403 {
+			return ErrorForbidden{err: err.Error()}
+		}
+	}
+	return err
+}
+
+func (c *client) UnassignGiteeIssue(org, repo string, number string, login string) error {
+	return c.AssignGiteeIssue(org, repo, number, " ")
+}
+
+func (c *client) CreateGiteeIssueComment(org, repo string, number string, comment string) error {
+	opt := sdk.IssueCommentPostParam{Body: comment}
+	_, _, err := c.ac.IssuesApi.PostV5ReposOwnerRepoIssuesNumberComments(
+		context.Background(), org, repo, number, opt)
+	return err
+}
+
+func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
+	v, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaboratorsUsername(
+		context.Background(), owner, repo, login, nil)
+	if err != nil {
+		if v.StatusCode == 404 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

@@ -93,7 +93,7 @@ func (d *dispatcher) Wait() {
 func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte) error {
 	l := logrus.WithFields(
 		logrus.Fields{
-			"event-type":   eventType,
+			"event-type":     eventType,
 			github.EventGUID: eventGUID,
 		},
 	)
@@ -214,10 +214,18 @@ func (d *dispatcher) handlePushEvent(pe *gitee.PushEvent, l *logrus.Entry) {
 func (d *dispatcher) handleNoteEvent(e *gitee.NoteEvent, l *logrus.Entry) {
 	defer d.wg.Done()
 
+	var n interface{}
+	switch *(e.NoteableType) {
+	case "PullRequest":
+		n = e.PullRequest.Number
+	case "Issue":
+		n = e.Issue.Number
+	}
+
 	l = l.WithFields(logrus.Fields{
 		github.OrgLogField:  e.Repository.Owner.Login,
 		github.RepoLogField: e.Repository.Name,
-		github.PrLogField:   e.PullRequest.Number,
+		github.PrLogField:   n,
 		"review":            e.Comment.Id,
 		"commenter":         e.Comment.User.Login,
 		"url":               e.Comment.HtmlUrl,

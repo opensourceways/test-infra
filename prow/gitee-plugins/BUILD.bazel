@@ -8,6 +8,7 @@ go_library(
         "dispatcher.go",
         "plugin.go",
         "plugins.go",
+        "respond.go",
     ],
     importpath = "k8s.io/test-infra/prow/gitee-plugins",
     visibility = ["//visibility:public"],

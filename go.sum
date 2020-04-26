@@ -16,8 +16,8 @@ contrib.go.opencensus.io/exporter/stackdriver v0.12.8/go.mod h1:XyyafDnFOsqoxHJg
 contrib.go.opencensus.io/integrations/ocsql v0.1.4/go.mod h1:8DsSdjz3F+APR+0z0WkU1aRorQCFfRxvqjUUPMbF3fE=
 contrib.go.opencensus.io/resource v0.1.1/go.mod h1:F361eGI91LCmW1I/Saf+rX0+OFcigGlFvXwEGEnkRLA=
 git.apache.org/thrift.git v0.12.0/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
-gitee.com/openeuler/go-gitee v0.0.0-20200421085606-b5c14af251af h1:anPYokl5XfI3WdFQB5OUzsbY+EvkG77gO1FU6vaiptI=
-gitee.com/openeuler/go-gitee v0.0.0-20200421085606-b5c14af251af/go.mod h1:TQrS/LP/DFXLqM+lVrZd4nL2pbTrqiXABGT9PJepVTA=
+gitee.com/openeuler/go-gitee v0.0.0-20200423030551-27093fdcaf21 h1:IVayS8PZbOQQ8Cu8Y3wdG2lMaqVT7Zrt8OErhsxPiHE=
+gitee.com/openeuler/go-gitee v0.0.0-20200423030551-27093fdcaf21/go.mod h1:TQrS/LP/DFXLqM+lVrZd4nL2pbTrqiXABGT9PJepVTA=
 github.com/Azure/azure-amqp-common-go/v2 v2.1.0/go.mod h1:R8rea+gJRuJR6QxTir/XuEd+YuKoUiazDC/N96FiDEU=
 github.com/Azure/azure-pipeline-go v0.2.1 h1:OLBdZJ3yvOn2MezlWvbrBMTEUQC72zAftRZOMdj5HYo=
 github.com/Azure/azure-pipeline-go v0.2.1/go.mod h1:UGSo8XybXnIGZ3epmeBw7Jdz+HiUVpqIlpz/HKHylF4=

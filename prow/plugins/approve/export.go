@@ -24,3 +24,5 @@ func NewState(org, repo, branch, body, author, url string, number int, assignees
 		htmlURL:   url,
 	}
 }
+
+var HelpProvider = helpProvider

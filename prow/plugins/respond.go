@@ -32,6 +32,9 @@ const AboutThisBotCommands = "I understand the commands that are listed [here](h
 // AboutThisBot contains the text of both AboutThisBotWithoutCommands and AboutThisBotCommands.
 const AboutThisBot = AboutThisBotWithoutCommands + " " + AboutThisBotCommands
 
+// ExAboutThisBotWithoutCommands is the alias of AboutThisBotWithoutCommands to be used for other platform, such as gitee
+var ExAboutThisBotWithoutCommands = AboutThisBotWithoutCommands
+
 // FormatResponse nicely formats a response to a generic reason.
 func FormatResponse(to, message, reason string) string {
 	format := `@%s: %s
@@ -43,7 +46,7 @@ func FormatResponse(to, message, reason string) string {
 %s
 </details>`
 
-	return fmt.Sprintf(format, to, message, reason, AboutThisBotWithoutCommands)
+	return fmt.Sprintf(format, to, message, reason, ExAboutThisBotWithoutCommands)
 }
 
 // FormatSimpleResponse formats a response that does not warrant additional explanation in the
@@ -56,7 +59,7 @@ func FormatSimpleResponse(to, message string) string {
 %s
 </details>`
 
-	return fmt.Sprintf(format, to, message, AboutThisBotWithoutCommands)
+	return fmt.Sprintf(format, to, message, ExAboutThisBotWithoutCommands)
 }
 
 // FormatICResponse nicely formats a response to an issue comment.
