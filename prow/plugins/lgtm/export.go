@@ -14,6 +14,8 @@ func NewReviewCtx(author, issueAuthor, body, htmlURL string, repo github.Repo, a
 	}
 }
 
-var Handle = handle
-
-var HelpProvider = helpProvider
+var (
+	Handle = handle
+	HelpProvider = helpProvider
+	HandlePullRequest = handlePullRequest
+)

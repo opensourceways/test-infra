@@ -74,7 +74,7 @@ func (lg *lgtm) NewPluginConfig() plugins.PluginConfig {
 func (lg *lgtm) RegisterEventHandler(p plugins.Plugins) {
 	name := lg.PluginName()
 	p.RegisterNoteEventHandler(name, lg.handleNoteEvent)
-	//p.RegisterPullRequestHandler(name, lg.handlePullRequestEvent)
+	p.RegisterPullRequestHandler(name, lg.handlePullRequestEvent)
 }
 
 func (lg *lgtm) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
@@ -126,6 +126,39 @@ func (lg *lgtm) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	return originl.Handle(toAdd, c, lg.oc, rc, lg.ghc, log, cp)
 }
 
+func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
+	funcStart := time.Now()
+	defer func() {
+		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handlePullRequest")
+	}()
+
+	if *(e.State) != "open" {
+		log.Debug("Pull request state is not open, skipping...")
+		return nil
+	}
+
+	if *(e.Action) != "update" {
+		log.Debug("Pull request event is not update , skipping...")
+		return nil
+	}
+
+	c, err := lg.buildOriginConfig()
+	if err != nil {
+		return err
+	}
+
+	pr := e.PullRequest
+	var pe github.PullRequestEvent
+	pe.Action = github.PullRequestActionSynchronize
+	pe.PullRequest.Base.Repo.Owner.Login = pr.Base.Repo.Owner.Login
+	pe.PullRequest.Base.Repo.Name = pr.Base.Repo.Name
+	pe.PullRequest.User.Login = pr.User.Login
+	pe.PullRequest.Number = int(pr.Number)
+	pe.PullRequest.Head.SHA = pr.Head.Sha
+
+	return originl.HandlePullRequest(log, lg.ghc, c, &pe)
+}
+
 func (lg *lgtm) pluginConfig() (*configuration, error) {
 	c := lg.getPluginConfig(lg.PluginName())
 	if c == nil {
@@ -164,7 +197,3 @@ func doWhat(comment string) (bool, bool) {
 
 	return false, false
 }
-
-/*
-func newCommentPruner(org, repo string, pr int, log *logrus.Entry) *commentpruner.EventClient {
-}*/
