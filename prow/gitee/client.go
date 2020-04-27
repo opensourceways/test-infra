@@ -107,6 +107,12 @@ func (c *client) UpdatePullRequest(org, repo string, number int32, title, body, 
 	return pr, err
 }
 
+func (c *client) GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error) {
+	pr, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumber(
+		context.Background(), org, repo, int32(number), nil)
+	return pr, err
+}
+
 func (c *client) getUserData() error {
 	if c.userData == nil {
 		c.mut.Lock()
@@ -289,4 +295,16 @@ func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error) {
+	var r github.SingleCommit
+
+	v, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCommitsSha(context.Background(), org, repo, SHA, nil)
+	if err != nil {
+		return r, err
+	}
+
+	r.Commit.Tree.SHA = v.Commit.Tree.Sha
+	return r, nil
 }
