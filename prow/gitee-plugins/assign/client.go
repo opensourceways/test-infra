@@ -33,15 +33,26 @@ func (c *ghclient) issueNumber() string {
 	return c.e.Issue.Number
 }
 
-func (c *ghclient) assignPR(owner, repo string, number int, logins []string) error {
+func (c *ghclient) peopleCanAssignPRTo(owner, repo string, number int) (map[string]bool, error) {
 	v, err := c.ListCollaborators(owner, repo)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	cs := map[string]bool{}
 	for _, item := range v {
 		cs[item.Login] = true
+	}
+
+	// TODO: maybe other people not only collaborators can assign pr
+
+	return cs, nil
+}
+
+func (c *ghclient) assignPR(owner, repo string, number int, logins []string) error {
+	cs, err := c.peopleCanAssignPRTo(owner, repo, number)
+	if err != nil {
+		return err
 	}
 
 	var toAdd []string
