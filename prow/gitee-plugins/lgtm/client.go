@@ -35,7 +35,7 @@ func (c *ghclient) AddLabel(org, repo string, number int, label string) error {
 }
 
 func (c *ghclient) AssignIssue(owner, repo string, number int, logins []string) error {
-	return c.assignPR(owner, repo, number, logins)
+	return c.AssignPR(owner, repo, number, logins)
 }
 
 func (c *ghclient) CreateComment(owner, repo string, number int, comment string) error {
@@ -102,38 +102,4 @@ func (c *ghclient) GetPullRequest(org, repo string, number int) (*github.PullReq
 	}
 
 	return gitee.ConvertGiteePR(&v), nil
-}
-
-func (c *ghclient) assignPR(owner, repo string, number int, logins []string) error {
-	v, err := c.ListCollaborators(owner, repo)
-	if err != nil {
-		return err
-	}
-
-	cs := map[string]bool{}
-	for _, item := range v {
-		cs[item.Login] = true
-	}
-
-	var toAdd []string
-	var toExclude []string
-	for _, i := range logins {
-		if cs[i] {
-			toAdd = append(toAdd, i)
-		} else {
-			toExclude = append(toExclude, i)
-		}
-	}
-
-	if len(toAdd) > 0 {
-		err = c.AssignPR(owner, repo, number, toAdd)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(toExclude) > 0 {
-		return github.MissingUsers{Users: toExclude}
-	}
-	return nil
 }
