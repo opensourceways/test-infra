@@ -206,7 +206,7 @@ func (a *approve) handle(org, repo string, pr *sdk.PullRequestHook, log *logrus.
 		return err
 	}
 
-	assignees := make([]github.User, 0, len(pr.Assignees))
+	assignees := make([]github.User, len(pr.Assignees))
 	for i, item := range pr.Assignees {
 		assignees[i] = github.User{Login: item.Login}
 	}
