@@ -30,4 +30,6 @@ type Client interface {
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
 
 	IsCollaborator(owner, repo, login string) (bool, error)
+	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
+	GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error)
 }

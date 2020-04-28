@@ -20,3 +20,11 @@ func ConvertGiteePRComment(i sdk.PullRequestComments) github.IssueComment {
 		UpdatedAt: ut,
 	}
 }
+
+func ConvertGiteePR(v *sdk.PullRequest) *github.PullRequest {
+	var r github.PullRequest
+	r.Head.SHA = v.Head.Sha
+	r.Head.Ref = v.Head.Ref
+	r.Base.Ref = v.Base.Ref
+	return &r
+}
