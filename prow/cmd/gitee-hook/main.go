@@ -53,7 +53,6 @@ type options struct {
 	dryRun      bool
 	gracePeriod time.Duration
 	kubernetes  prowflagutil.KubernetesOptions
-	github      prowflagutil.GitHubOptions
 	bugzilla    prowflagutil.BugzillaOptions
 	gitee       prowflagutil.GiteeOptions
 
@@ -62,7 +61,7 @@ type options struct {
 }
 
 func (o *options) Validate() error {
-	for _, group := range []flagutil.OptionGroup{&o.kubernetes, &o.github, &o.bugzilla} {
+	for _, group := range []flagutil.OptionGroup{&o.kubernetes, &o.gitee, &o.bugzilla} {
 		if err := group.Validate(o.dryRun); err != nil {
 			return err
 		}
@@ -81,7 +80,7 @@ func gatherOptions(fs *flag.FlagSet, args ...string) options {
 
 	fs.BoolVar(&o.dryRun, "dry-run", true, "Dry run for testing. Uses API tokens but does not mutate.")
 	fs.DurationVar(&o.gracePeriod, "grace-period", 180*time.Second, "On shutdown, try to handle remaining events for the specified duration. ")
-	for _, group := range []flagutil.OptionGroup{&o.kubernetes, &o.github, &o.bugzilla, &o.gitee} {
+	for _, group := range []flagutil.OptionGroup{&o.kubernetes, &o.bugzilla, &o.gitee} {
 		group.AddFlags(fs)
 	}
 
@@ -106,8 +105,7 @@ func main() {
 
 	var tokens []string
 
-	// Append the path of hmac and github secrets.
-	tokens = append(tokens, o.github.TokenPath)
+	// Append the path of hmac and gitee secrets.
 	tokens = append(tokens, o.webhookSecretFile)
 	tokens = append(tokens, o.gitee.TokenPath)
 
