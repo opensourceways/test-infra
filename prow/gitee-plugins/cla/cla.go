@@ -119,6 +119,7 @@ func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
 			}
 		}
+		this.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.Head.User.Login))
 	} else {
 		if hasCLAYes {
 			if err := this.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
@@ -131,6 +132,7 @@ func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
 			}
 		}
+		this.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee"))
 	}
 	return nil
 }
@@ -254,4 +256,9 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 	`
 
 	return fmt.Sprintf(s, signURL, platform)
+}
+
+func alreadySigned(user string) string {
+	s := `***@%s***, thanks for your pull request. You've already signed CLA successfully. :wave: `
+	return fmt.Sprintf(s, user)
 }
