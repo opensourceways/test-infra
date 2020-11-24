@@ -16,8 +16,8 @@ type ScriptCfg struct {
 	Process  string   `json:"process"`
 	Endpoint string   `json:"endpoint"`
 	Repos    []string `json:"repos"`
-	PPLName  string   `json:"pplname" yaml:"pplname"`
-	PPLType  string   `json:"ppltype" yaml:"ppltype"`
+	PPLName  string   `json:"pplname"`
+	PPLType  string   `json:"ppltype"`
 }
 
 func (hac *hookAgentConfig) getNeedHandleScript(fullName string) map[string]ScriptCfg {
@@ -51,5 +51,3 @@ func load(path string) (hookAgentConfig, error) {
 	}
 	return c, nil
 }
-
-

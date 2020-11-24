@@ -58,7 +58,7 @@ func main() {
 	//config setting
 	cfg, err := load(o.hookAgentConfig)
 	if err != nil {
-		log.WithError(err)
+		log.Error(err)
 	}
 	secretAgent := &secret.Agent{}
 	if err := secretAgent.Start([]string{o.gitee.TokenPath, o.webhookSecretFile}); err != nil {

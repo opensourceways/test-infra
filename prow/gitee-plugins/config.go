@@ -44,8 +44,26 @@ type Configurations struct {
 	// Owners contains configuration related to handling OWNERS files.
 	Owners origin.Owners `json:"owners,omitempty"`
 
+	// ExternalPlugins is a map of repositories (eg "k/k") to lists of
+	// external plugins.
+	ExternalPlugins map[string][]ExternalPlugin `json:"external_plugins,omitempty"`
+
 	// Built-in plugins specific configuration.
 	pluginConfigs map[string]PluginConfig
+}
+
+// ExternalPlugin holds configuration for registering an external
+// plugin in prow.
+type ExternalPlugin struct {
+	// Name of the plugin.
+	Name string `json:"name"`
+	// Endpoint is the location of the external plugin. Defaults to
+	// the name of the plugin, ie. "http://{{name}}".
+	Endpoint string `json:"endpoint,omitempty"`
+	// Events are the events that need to be demuxed by the hook
+	// server to the external plugin. If no events are specified,
+	// everything is sent.
+	Events []string `json:"events,omitempty"`
 }
 
 func (c *Configurations) GetPluginConfig(name string) PluginConfig {

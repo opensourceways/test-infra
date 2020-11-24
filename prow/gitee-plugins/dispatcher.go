@@ -1,9 +1,14 @@
 package plugins
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
 	"sync"
+	"time"
 
 	"gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
@@ -19,6 +24,9 @@ type dispatcher struct {
 	c  *ConfigAgent
 	ps *plugins
 
+	// ec is an http client used for dispatching events
+	// to external plugin services.
+	ec http.Client
 	// Tracks running handlers for graceful shutdown
 	wg sync.WaitGroup
 }
@@ -90,7 +98,7 @@ func (d *dispatcher) Wait() {
 	d.wg.Wait() // Handle remaining requests
 }
 
-func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte) error {
+func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h http.Header) error {
 	l := logrus.WithFields(
 		logrus.Fields{
 			"event-type":     eventType,
@@ -98,12 +106,14 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte) error
 		},
 	)
 
+	var srcRepo string
 	switch eventType {
 	case "Note Hook":
 		var e gitee.NoteEvent
 		if err := json.Unmarshal(payload, &e); err != nil {
 			return err
 		}
+		srcRepo = e.Repository.FullName
 		d.wg.Add(1)
 		go d.handleNoteEvent(&e, l)
 
@@ -112,6 +122,7 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte) error
 		if err := json.Unmarshal(payload, &ie); err != nil {
 			return err
 		}
+		srcRepo = ie.Repository.FullName
 		d.wg.Add(1)
 		go d.handleIssueEvent(&ie, l)
 
@@ -120,6 +131,7 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte) error
 		if err := json.Unmarshal(payload, &pr); err != nil {
 			return err
 		}
+		srcRepo = pr.Repository.FullName
 		d.wg.Add(1)
 		go d.handlePullRequestEvent(&pr, l)
 
@@ -128,13 +140,97 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte) error
 		if err := json.Unmarshal(payload, &pe); err != nil {
 			return err
 		}
+		srcRepo = pe.Repository.FullName
 		d.wg.Add(1)
 		go d.handlePushEvent(&pe, l)
 
 	default:
 		l.Debug("Ignoring unhandled event type")
 	}
+	//dispatcher hook event only to external plugins that require this event
+	if eps := d.needDispatchExternalPlugins(eventType, srcRepo); len(eps) > 0 {
+		go d.dispatchExternal(l, eps, payload, h)
+	}
 	return nil
+}
+
+func (d *dispatcher) needDispatchExternalPlugins(eventType, srcRepo string) []ExternalPlugin {
+	var matching []ExternalPlugin
+	srcOrg := strings.Split(srcRepo, "/")[0]
+	for repo, ep := range d.c.Config().ExternalPlugins {
+		if repo != srcRepo && repo != srcOrg {
+			continue
+		}
+		for _, p := range ep {
+			if len(p.Events) == 0 {
+				matching = append(matching, p)
+			} else {
+				for _, et := range p.Events {
+					if et != eventType {
+						continue
+					}
+					matching = append(matching, p)
+					break
+				}
+			}
+		}
+	}
+	return matching
+}
+
+func (d *dispatcher) dispatchExternal(l *logrus.Entry, externalPlugins []ExternalPlugin, payload []byte, h http.Header) {
+	h.Set("User-Agent", "ProwHook")
+	for _, p := range externalPlugins {
+		d.wg.Add(1)
+		go func(p ExternalPlugin) {
+			defer d.wg.Done()
+			if err := d.dispatch(p.Endpoint, payload, h); err != nil {
+				l.WithError(err).WithField("external-plugin", p.Name).Error("Error dispatching event to external plugin.")
+			} else {
+				l.WithField("external-plugin", p.Name).Info("Dispatched event to external plugin")
+			}
+		}(p)
+	}
+}
+
+// dispatch creates a new request using the provided payload and headers
+// and dispatches the request to the provided endpoint.
+func (d *dispatcher) dispatch(endpoint string, payload []byte, h http.Header) error {
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header = h
+	resp, err := d.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	rb, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("response has status %q and body %q", resp.Status, string(rb))
+	}
+	return nil
+}
+
+func (d *dispatcher) do(req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	backoff := 100 * time.Millisecond
+	maxRetries := 5
+
+	for retries := 0; retries < maxRetries; retries++ {
+		resp, err = d.ec.Do(req)
+		if err == nil {
+			break
+		}
+		time.Sleep(backoff)
+		backoff *= 2
+	}
+	return resp, err
 }
 
 func (d *dispatcher) handlePullRequestEvent(pr *gitee.PullRequestEvent, l *logrus.Entry) {
