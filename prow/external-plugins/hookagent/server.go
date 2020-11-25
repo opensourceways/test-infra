@@ -3,15 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os/exec"
+	"sync"
+
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/git/v2"
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/pluginhelp"
-	"net/http"
-	"os/exec"
-	"sync"
 )
 
 type giteeClient interface {

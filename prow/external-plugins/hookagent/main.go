@@ -2,16 +2,19 @@ package main
 
 import (
 	"flag"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/test-infra/pkg/flagutil"
 	"k8s.io/test-infra/prow/config/secret"
 	prowflagutil "k8s.io/test-infra/prow/flagutil"
 	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/pluginhelp/externalplugins"
-	"net/http"
-	"os"
-	"strconv"
-	"time"
+
 )
 
 type options struct {

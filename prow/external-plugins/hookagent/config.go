@@ -2,8 +2,9 @@ package main
 
 import (
 	"io/ioutil"
-	"sigs.k8s.io/yaml"
 	"strings"
+
+	"sigs.k8s.io/yaml"
 )
 
 type hookAgentConfig struct {
