@@ -111,10 +111,11 @@ func (s *server) execScript(fullName, eventType, payload string) {
 				param = append(param, c.PPLType, eventType)
 			}
 			cmd, err := execCmd(c.Process, param...)
+			s.log.Debug(string(cmd))
 			if err != nil {
 				s.log.Error(err)
 			}
-			s.log.Info(cmd)
+
 		}(v)
 	}
 
