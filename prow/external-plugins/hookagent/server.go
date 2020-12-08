@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"strings"
 	"sync"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -99,7 +100,10 @@ func (s *server) execScript(fullName, eventType, payload string) {
 		go func(c ScriptCfg) {
 			defer s.wg.Done()
 			param := make([]string, 0, 4)
-			param = append(param, c.Endpoint)
+			tmp := strings.Trim(c.Endpoint, " ")
+			if tmp != "" {
+				param = append(param, c.Endpoint)
+			}
 			if c.PPLName == "" {
 				param = append(param, payload)
 			} else {
