@@ -14,7 +14,6 @@ import (
 	prowflagutil "k8s.io/test-infra/prow/flagutil"
 	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/pluginhelp/externalplugins"
-
 )
 
 type options struct {
@@ -61,7 +60,7 @@ func main() {
 	//config setting
 	cfg, err := load(o.hookAgentConfig)
 	if err != nil {
-		log.Error(err)
+		logrus.WithError(err).Fatal("Error loading hookAgent config.")
 	}
 	secretAgent := &secret.Agent{}
 	if err := secretAgent.Start([]string{o.gitee.TokenPath, o.webhookSecretFile}); err != nil {

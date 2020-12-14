@@ -62,24 +62,12 @@ func (s *server) handleEvent(eventType, eventGUID string, payload []byte) error 
 			return err
 		}
 		fullName = e.Repository.FullName
-	case "IssueHook":
-		var ie sdk.IssueEvent
-		if err := json.Unmarshal(payload, &ie); err != nil {
-			return err
-		}
-		fullName = ie.Repository.FullName
 	case "Merge Request Hook":
 		var pr sdk.PullRequestEvent
 		if err := json.Unmarshal(payload, &pr); err != nil {
 			return err
 		}
 		fullName = pr.Repository.FullName
-	case "Push Hook":
-		var pe sdk.PushEvent
-		if err := json.Unmarshal(payload, &pe); err != nil {
-			return err
-		}
-		fullName = pe.Repository.FullName
 	default:
 		s.log.Debug("Ignoring unhandled event type", eventType, eventGUID)
 	}
@@ -100,8 +88,8 @@ func (s *server) execScript(fullName, eventType, payload string) {
 		go func(c ScriptCfg) {
 			defer s.wg.Done()
 			param := make([]string, 0, 4)
-			tmp := strings.Trim(c.Endpoint," ")
-			if tmp != ""{
+			tmp := strings.Trim(c.Endpoint, " ")
+			if tmp != "" {
 				param = append(param, c.Endpoint)
 			}
 			if c.PPLName == "" {
