@@ -12,21 +12,15 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/test-infra/prow/config"
-	"k8s.io/test-infra/prow/git/v2"
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/pluginhelp"
 )
 
-type giteeClient interface {
-}
 
 type server struct {
 	tokenGenerator func() []byte
 	config         func() hookAgentConfig
-	gec            giteeClient
-	gegc           git.ClientFactory
 	log            *logrus.Entry
-	robot          string
 	wg             sync.WaitGroup
 }
 

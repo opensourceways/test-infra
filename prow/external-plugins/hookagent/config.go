@@ -9,7 +9,7 @@ import (
 )
 
 type hookAgentConfig struct {
-	Scripts []ScriptCfg `json:"scripts,omitempty"`
+	HookAgent []ScriptCfg `json:"hook_agent,omitempty"`
 }
 
 //ScriptCfg External plugin script configuration
@@ -33,7 +33,7 @@ type ScriptCfg struct {
 func (hac *hookAgentConfig) getNeedHandleScript(fullName string) map[string]ScriptCfg {
 	needs := make(map[string]ScriptCfg, 0)
 	ns := strings.Split(fullName, "/")[0]
-	for _, s := range hac.Scripts {
+	for _, s := range hac.HookAgent {
 		//all hook event will dispatch to script when not config repos
 		if len(s.Repos) == 0 {
 			needs[s.Name] = s
@@ -51,11 +51,11 @@ func (hac *hookAgentConfig) getNeedHandleScript(fullName string) map[string]Scri
 
 func (hac *hookAgentConfig) validate() error {
 	var err error
-	if len(hac.Scripts) == 0 {
+	if len(hac.HookAgent) == 0 {
 		return err
 	}
 
-	for _, v := range hac.Scripts {
+	for _, v := range hac.HookAgent {
 		if v.Name == "" {
 			err = fmt.Errorf("config error: Each third-party script needs to set its own name ")
 			break
