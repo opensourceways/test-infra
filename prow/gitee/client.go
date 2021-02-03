@@ -250,6 +250,25 @@ func (c *client) ListPRComments(org, repo string, number int) ([]sdk.PullRequest
 	return r, nil
 }
 
+func (c *client) ListPrIssues(org, repo string, number int32) ([] sdk.Issue, error) {
+	var issues []sdk.Issue
+	p := int32(1)
+	opt := sdk.GetV5ReposOwnerRepoPullsNumberIssuesOpts{}
+	for {
+		opt.Page = optional.NewInt32(p)
+		iss, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberIssues(context.Background(), org, repo, number, &opt)
+		if err != nil {
+			return nil, formatErr(err, "list issues of pr")
+		}
+		if len(iss) == 0 {
+			break
+		}
+		p += 1
+		issues = append(issues, iss...)
+	}
+	return issues, nil
+}
+
 func (c *client) DeletePRComment(org, repo string, ID int) error {
 	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsCommentsId(
 		context.Background(), org, repo, int32(ID), nil)
@@ -395,6 +414,18 @@ func (c *client) GetRepos(org string) ([]sdk.Project, error) {
 	}
 
 	return r, nil
+}
+
+func (c *client) AddIssueLabel(org, repo, number, label string) error {
+	opt := &sdk.PostV5ReposOwnerRepoIssuesNumberLabelsOpts{Body: optional.NewInterface([]string{label})}
+	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(context.Background(), org, repo, number, opt)
+	return err
+}
+
+func (c *client) RemoveIssueLabel(org, repo, number, label string) error {
+	label = strings.Replace(label, "/", "%2F", -1)
+	_, err := c.ac.LabelsApi.DeleteV5ReposOwnerRepoIssuesNumberLabelsName(context.Background(), org, repo, number, label, nil)
+	return err
 }
 
 func formatErr(err error, doWhat string) error {
