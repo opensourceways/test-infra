@@ -8,7 +8,7 @@ go_library(
         "config.go",
         "server.go",
     ],
-    importpath = "k8s.io/test-infra/prow/external-plugins/sync-pr",
+    importpath = "k8s.io/test-infra/prow/external-plugins/hookagent",
     visibility = ["//visibility:private"],
     deps = [
         "//pkg/flagutil:go_default_library",

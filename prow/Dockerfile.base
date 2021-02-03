@@ -1,0 +1,15 @@
+FROM ubuntu:latest
+LABEL maintainer="Xie Weizhi" description="bazel2.2.0 build environment image"
+RUN apt update && \
+    apt -y install curl gnupg git python python3 python3-pip && \
+    curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg && \
+    mv bazel.gpg /etc/apt/trusted.gpg.d/ && \
+    echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" |  tee /etc/apt/sources.list.d/bazel.list && \
+    apt update &&  apt -y  install bazel-2.2.0 && \
+    apt clean && \
+    ln -s /usr/bin/bazel-2.2.0 /usr/bin/bazel && bazel version
+WORKDIR /usr/local
+COPY .  ./test-infra
+RUN cd test-infra && \
+    bazel build prow/cmd/gitee-hook && \
+    cd ../ && rm -r test-infra
