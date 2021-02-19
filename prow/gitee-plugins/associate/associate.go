@@ -30,24 +30,24 @@ func (m *associate) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp
 	}
 	pluginHelp.AddCommand(pluginhelp.Command{
 		Usage:       "/check-milestone",
-		Description: "Mandatory check whether the issue is set with milestone,remove or add miss/milestone label",
+		Description: "Check whether the issue is set a milestone, remove or add needs-milestone label",
 		Featured:    true,
 		WhoCanUse:   "Anyone",
 		Examples:    []string{"/check-milestone"},
 	})
 	pluginHelp.AddCommand(pluginhelp.Command{
 		Usage:       "/check-issue",
-		Description: "Mandatory check whether the PullRequest associated issue,remove or add miss-issue label",
+		Description: "Check whether the Pull Request is associated with at least an issue, remove or add needs-issue label",
 		Featured:    true,
 		WhoCanUse:   "Anyone",
 		Examples:    []string{"/check-issue"},
 	})
 	pluginHelp.AddCommand(pluginhelp.Command{
-		Usage:       "/remove-miss/issue",
-		Description: "remove the miss/issue label",
+		Usage:       "/remove-needs-issue",
+		Description: "remove the needs-issue label",
 		Featured:    true,
-		WhoCanUse:   "Members of the project maintainer gitee team can use the '/remove-miss/issue' command.",
-		Examples:    []string{"/remove-miss/issue"},
+		WhoCanUse:   "Members of the project can use the '/remove-needs-issue' command",
+		Examples:    []string{"/remove-needs-issue"},
 	})
 	return pluginHelp, nil
 }
@@ -92,25 +92,26 @@ func (m *associate) handleNoteEvent(e *sdk.NoteEvent, log *log.Entry) error {
 		return handleIssueNoteEvent(m.ghc, e)
 	}
 	if *(e.NoteableType) == "PullRequest" {
-		//handle pullrequest
 		return handlePrComment(m.ghc, e)
 	}
 	return nil
 }
 
 func (m *associate) handlePREvent(e *sdk.PullRequestEvent, log *log.Entry) error {
-	if err := handlePrCreate(m.ghc, e, log); err != nil {
-		return err
+	if e == nil {
+		return errors.New("pr event payload is nil")
+	}
+	if *(e.Action) == "open" {
+		return handlePrCreate(m.ghc, e, log)
 	}
 	return nil
 }
 
-func judgeHasLabel(labs []sdk.LabelHook, label string) bool {
-	hasLabel := false
+func hasLabel(labs []sdk.LabelHook, label string) bool {
 	for _, lab := range labs {
 		if lab.Name == label {
-			hasLabel = true
+			return true
 		}
 	}
-	return hasLabel
+	return false
 }

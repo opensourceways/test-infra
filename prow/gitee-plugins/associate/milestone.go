@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	unsetMilestoneLabel   = "miss/milestone"
-	unsetMilestoneComment = "@%s You have not selected a milestone,please select a milestone.After setting the milestone, you can use the **/check-milestone** command to remove the **miss/milestone** label."
+	unsetMilestoneLabel   = "needs-milestone"
+	unsetMilestoneComment = "@%s You have not selected a milestone,please select a milestone.After setting the milestone, you can use the **/check-milestone** command to remove the **needs-milestone** label."
 )
 
 var checkMilestoneRe = regexp.MustCompile(`(?mi)^/check-milestone\s*$`)
@@ -38,13 +38,12 @@ func handleIssueUpdate(ghc milestoneClient, e *sdk.IssueEvent) error {
 	repo := e.Repository.Path
 	number := e.Issue.Number
 	author := e.Issue.User.Login
-	hasLabel := judgeHasLabel(e.Issue.Labels, unsetMilestoneLabel)
+	hasLabel := hasLabel(e.Issue.Labels, unsetMilestoneLabel)
 	if e.Issue.Milestone != nil && e.Issue.Milestone.Id != 0 {
 		if hasLabel {
 			return ghc.RemoveIssueLabel(owner, repo, number, unsetMilestoneLabel)
 		}
-	}
-	if !hasLabel {
+	} else if !hasLabel {
 		return handleAddLabelAndComment(ghc, owner, repo, number, author)
 	}
 	return nil
@@ -59,16 +58,12 @@ func handleIssueNoteEvent(ghc milestoneClient, e *sdk.NoteEvent) error {
 	repo := e.Repository.Path
 	number := e.Issue.Number
 	author := e.Issue.User.Login
-	hasLabel := judgeHasLabel(e.Issue.Labels, unsetMilestoneLabel)
+	hasLabel := hasLabel(e.Issue.Labels, unsetMilestoneLabel)
 	if e.Issue.Milestone != nil && e.Issue.Milestone.Id != 0 {
 		if hasLabel {
-			//remove unset-milestone
 			return ghc.RemoveIssueLabel(owner, repo, number, unsetMilestoneLabel)
-		} else {
-			return nil
 		}
-	}
-	if !hasLabel {
+	} else if !hasLabel {
 		return handleAddLabelAndComment(ghc, owner, repo, number, author)
 	}
 	return nil

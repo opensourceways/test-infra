@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	missIssueComment = "@%s PullRequest must be associated with an issue, please associate at least one issue. after associating an issue, you can use the **/check-issue** command to remove the **miss/issue** label."
-	missIssueLabel   = "miss/issue"
+	missIssueComment = "@%s PullRequest must be associated with an issue, please associate at least one issue. after associating an issue, you can use the **/check-issue** command to remove the **needs-issue** label."
+	missIssueLabel   = "needs-issue"
 )
 
 var (
 	checkIssueRe    = regexp.MustCompile(`(?mi)^/check-issue\s*$`)
-	removeMissIssue = regexp.MustCompile(`(?mi)^/remove-miss/issue\s*$`)
+	removeMissIssue = regexp.MustCompile(`(?mi)^/remove-needs-issue\s*$`)
 )
 
 type checkIssueClient interface {
@@ -23,7 +23,7 @@ type checkIssueClient interface {
 	RemovePRLabel(org, repo string, number int, label string) error
 	CreatePRComment(org, repo string, number int, comment string) error
 	IsCollaborator(owner, repo, login string) (bool, error)
-	ListPrIssues(org, repo string, number int32) ([] sdk.Issue, error)
+	ListPrIssues(org, repo string, number int32) ([]sdk.Issue, error)
 }
 
 func handlePrComment(ghc checkIssueClient, e *sdk.NoteEvent) error {
@@ -40,7 +40,7 @@ func handleRemoveMissLabel(ghc checkIssueClient, e *sdk.NoteEvent) error {
 	org := e.Repository.Namespace
 	repo := e.Repository.Path
 	number := int(e.PullRequest.Number)
-	if hasLabel := judgeHasLabel(e.PullRequest.Labels,missIssueLabel); !hasLabel {
+	if !hasLabel(e.PullRequest.Labels, missIssueLabel) {
 		return nil
 	}
 	author := e.Comment.User.Login
@@ -49,7 +49,7 @@ func handleRemoveMissLabel(ghc checkIssueClient, e *sdk.NoteEvent) error {
 		return err
 	}
 	if !isCo {
-		comment := fmt.Sprintf("@%s members of the project maintainer gitee team can use the '/remove-miss/issue' command.", author)
+		comment := fmt.Sprintf("@%s Members of the repository can use the '/remove-needs-issue' command.", author)
 		return ghc.CreatePRComment(org, repo, number, comment)
 	}
 	return ghc.RemovePRLabel(org, repo, int(e.PullRequest.Number), missIssueLabel)
@@ -64,28 +64,23 @@ func handleCheckIssue(ghc checkIssueClient, e *sdk.NoteEvent) error {
 	if err != nil {
 		return err
 	}
-	hasLabel := judgeHasLabel(e.PullRequest.Labels,missIssueLabel)
+	hasLabel := hasLabel(e.PullRequest.Labels, missIssueLabel)
 	if len(issues) == 0 {
 		if hasLabel {
 			return nil
 		}
-		err = ghc.AddPRLabel(org, repo, int(number), missIssueLabel)
-		if err != nil {
+		if err := ghc.AddPRLabel(org, repo, int(number), missIssueLabel); err != nil {
 			return err
 		}
 		return ghc.CreatePRComment(org, repo, int(number), fmt.Sprintf(missIssueComment, author))
 	}
-	if !hasLabel {
-		return nil
+	if hasLabel {
+		return ghc.RemovePRLabel(org, repo, int(number), missIssueLabel)
 	}
-	return ghc.RemovePRLabel(org, repo, int(number), missIssueLabel)
-
+	return nil
 }
 
 func handlePrCreate(ghc checkIssueClient, e *sdk.PullRequestEvent, log *logrus.Entry) error {
-	if *(e.Action) != "open" {
-		return nil
-	}
 	org := e.Repository.Namespace
 	repo := e.Repository.Path
 	number := e.PullRequest.Number
@@ -95,7 +90,7 @@ func handlePrCreate(ghc checkIssueClient, e *sdk.PullRequestEvent, log *logrus.E
 		log.Debug("get pr issues fail.")
 		return err
 	}
-	if len(iss) == 0 && !judgeHasLabel(e.PullRequest.Labels,missIssueLabel){
+	if len(iss) == 0 && !hasLabel(e.PullRequest.Labels, missIssueLabel) {
 		err = ghc.AddPRLabel(org, repo, int(number), missIssueLabel)
 		if err != nil {
 			return err
@@ -104,4 +99,3 @@ func handlePrCreate(ghc checkIssueClient, e *sdk.PullRequestEvent, log *logrus.E
 	}
 	return nil
 }
-
