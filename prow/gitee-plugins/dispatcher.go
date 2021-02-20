@@ -294,7 +294,7 @@ func (d *dispatcher) handlePushEvent(pe *gitee.PushEvent, l *logrus.Entry) {
 	})
 	l.Info("Push event.")
 
-	for p, h := range d.pushEventHandlers(pe.Repository.Owner.Name, pe.Repository.Path) {
+	for p, h := range d.pushEventHandlers(pe.Repository.Namespace, pe.Repository.Path) {
 		d.wg.Add(1)
 
 		go func(p string, h PushEventHandler) {

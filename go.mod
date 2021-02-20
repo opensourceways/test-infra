@@ -18,7 +18,7 @@ replace (
 
 require (
 	cloud.google.com/go v0.47.0
-	gitee.com/openeuler/go-gitee v0.0.0-20200918065743-cef3fb7bc147
+	gitee.com/openeuler/go-gitee v0.0.0-20210201095646-fd9179920723
 	github.com/Azure/azure-sdk-for-go v38.0.0+incompatible
 	github.com/Azure/azure-storage-blob-go v0.8.0
 	github.com/Azure/go-autorest/autorest v0.9.6
@@ -98,6 +98,7 @@ require (
 	gopkg.in/fsnotify.v1 v1.4.7
 	gopkg.in/ini.v1 v1.52.0 // indirect
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
+	gopkg.in/yaml.v2 v2.3.0
 	gopkg.in/yaml.v3 v3.0.0-20190709130402-674ba3eaed22
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3

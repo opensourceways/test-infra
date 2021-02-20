@@ -8,6 +8,7 @@ import (
 	"k8s.io/test-infra/prow/gitee-plugins/assign"
 	"k8s.io/test-infra/prow/gitee-plugins/cla"
 	"k8s.io/test-infra/prow/gitee-plugins/lgtm"
+	"k8s.io/test-infra/prow/gitee-plugins/repohandle"
 	"k8s.io/test-infra/prow/gitee-plugins/slack"
 	"k8s.io/test-infra/prow/gitee-plugins/trigger"
 	"k8s.io/test-infra/prow/github"
@@ -32,6 +33,7 @@ func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.P
 	v = append(v, trigger.NewTrigger(gpc, cfg, cs.giteeClient, cs.prowJobClient, cs.giteeGitClient))
 	v = append(v, slack.NewSlack(gpc, botname))
 	v = append(v, cla.NewCLA(gpc, cs.giteeClient))
+	v = append(v, repohandle.NewRepoHandle(gpc, agent.Config, cs.giteeClient))
 
 	for _, i := range v {
 		name := i.PluginName()

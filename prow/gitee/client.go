@@ -397,6 +397,58 @@ func (c *client) GetRepos(org string) ([]sdk.Project, error) {
 	return r, nil
 }
 
+//CreateRepo add a repository on gitee
+func (c *client) CreateRepo(owner string, param sdk.RepositoryPostParam) (sdk.Project, error) {
+	repos, _, err := c.ac.RepositoriesApi.PostV5OrgsOrgRepos(context.Background(), owner, param)
+	return repos, formatErr(err, "create repo")
+}
+
+//UpdateRepo update repository info
+func (c *client) UpdateRepo(owner, repo string, bp sdk.RepoPatchParam) error {
+	_, _, err := c.ac.RepositoriesApi.PatchV5ReposOwnerRepo(context.Background(), owner, repo, bp)
+	return formatErr(err, "update repo")
+}
+
+//GetPathContent Get the content under a specific repository
+func (c *client) GetPathContent(owner, repo, path, ref string) (sdk.Content, error) {
+	op := sdk.GetV5ReposOwnerRepoContentsPathOpts{}
+	op.Ref = optional.NewString(ref)
+	content, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoContentsPath(context.Background(), owner, repo, path, &op)
+	return content, formatErr(err, "get path content")
+}
+
+//GetRepoAllBranch get repository all branch
+func (c *client) GetRepoAllBranch(owner, repo string) ([]sdk.Branch, error) {
+	branches, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoBranches(context.Background(), owner, repo,
+		nil)
+	return branches, formatErr(err, "get repo all branch")
+}
+
+//CreateBranch create a branch on repository
+func (c *client) CreateBranch(owner, repo, ref, bName string) (sdk.CompleteBranch, error) {
+	param := sdk.CreateBranchParam{Refs: ref, BranchName: bName}
+	branch, _, err := c.ac.RepositoriesApi.PostV5ReposOwnerRepoBranches(context.Background(), owner, repo, param)
+	return branch, formatErr(err, "create branch")
+}
+
+//CancelBranchProtected cancel branch protected
+func (c *client) CancelBranchProtected(owner, repo, bName string) error {
+	_, err := c.ac.RepositoriesApi.DeleteV5ReposOwnerRepoBranchesBranchProtection(context.Background(), owner, repo, bName, nil)
+	return formatErr(err, "cancel branch protected")
+}
+
+//SetBranchProtected make branch protected
+func (c *client) SetBranchProtected(owner, repo, bName string) (sdk.CompleteBranch, error) {
+	branch, _, err := c.ac.RepositoriesApi.PutV5ReposOwnerRepoBranchesBranchProtection(context.Background(), owner, repo, bName, sdk.BranchProtectionPutParam{})
+	return branch, formatErr(err, "set branch protected")
+}
+
+func (c *client) AddRepositoryMember(owner, repo, username, permission string) error {
+	body := sdk.ProjectMemberPutParam{Permission: permission}
+	_, _, e := c.ac.RepositoriesApi.PutV5ReposOwnerRepoCollaboratorsUsername(context.Background(), owner, repo, username, body)
+	return formatErr(e, "add repo member")
+}
+
 func formatErr(err error, doWhat string) error {
 	if err == nil {
 		return err
