@@ -2,3 +2,5 @@ echo -e "[dailybuild_factory]\nname=dailybuild_factory\nbaseurl=http://119.3.219
 yum clean all
 yum makecache
 yum -y install openEuler-Advisor
+git config --global user.name "review_tool"
+git config --global user.email "review_tool@example.com"
