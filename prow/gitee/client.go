@@ -120,9 +120,8 @@ func (c *client) GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]s
 			break
 		}
 
-		p += 1
-
 		r = append(r, prs...)
+		p++
 	}
 
 	return r, nil
@@ -422,7 +421,8 @@ func (c *client) AddIssueLabel(org, repo, number, label string) error {
 
 func (c *client) RemoveIssueLabel(org, repo, number, label string) error {
 	label = strings.Replace(label, "/", "%2F", -1)
-	_, err := c.ac.LabelsApi.DeleteV5ReposOwnerRepoIssuesNumberLabelsName(context.Background(), org, repo, number, label, nil)
+	_, err := c.ac.LabelsApi.DeleteV5ReposOwnerRepoIssuesNumberLabelsName(context.Background(), org, repo, number,
+		label, nil)
 	return formatErr(err, "rm issue label")
 }
 

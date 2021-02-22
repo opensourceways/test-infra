@@ -33,22 +33,6 @@ func handleIssueCreate(ghc milestoneClient, e *sdk.IssueEvent, log *log.Entry) e
 	return handleAddLabelAndComment(ghc, owner, repo, number, author)
 }
 
-func handleIssueUpdate(ghc milestoneClient, e *sdk.IssueEvent) error {
-	owner := e.Repository.Namespace
-	repo := e.Repository.Path
-	number := e.Issue.Number
-	author := e.Issue.User.Login
-	hasLabel := hasLabel(e.Issue.Labels, unsetMilestoneLabel)
-	if e.Issue.Milestone != nil && e.Issue.Milestone.Id != 0 {
-		if hasLabel {
-			return ghc.RemoveIssueLabel(owner, repo, number, unsetMilestoneLabel)
-		}
-	} else if !hasLabel {
-		return handleAddLabelAndComment(ghc, owner, repo, number, author)
-	}
-	return nil
-}
-
 func handleIssueNoteEvent(ghc milestoneClient, e *sdk.NoteEvent) error {
 	// Only consider "/check-milestone" comments.
 	if !checkMilestoneRe.MatchString(e.Comment.Body) {
@@ -59,11 +43,11 @@ func handleIssueNoteEvent(ghc milestoneClient, e *sdk.NoteEvent) error {
 	number := e.Issue.Number
 	author := e.Issue.User.Login
 	hasLabel := hasLabel(e.Issue.Labels, unsetMilestoneLabel)
-	if e.Issue.Milestone != nil && e.Issue.Milestone.Id != 0 {
-		if hasLabel {
-			return ghc.RemoveIssueLabel(owner, repo, number, unsetMilestoneLabel)
-		}
-	} else if !hasLabel {
+	hasMile := e.Issue.Milestone != nil && e.Issue.Milestone.Id != 0
+	if hasMile && hasLabel {
+		return ghc.RemoveIssueLabel(owner, repo, number, unsetMilestoneLabel)
+	}
+	if !hasMile && !hasLabel {
 		return handleAddLabelAndComment(ghc, owner, repo, number, author)
 	}
 	return nil

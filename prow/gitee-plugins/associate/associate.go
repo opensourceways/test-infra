@@ -26,7 +26,7 @@ func NewAssociate(f plugins.GetPluginConfig, gec gitee.Client) plugins.Plugin {
 
 func (m *associate) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
 	pluginHelp := &pluginhelp.PluginHelp{
-		Description: "The associate plugin is used to detect whether the issue is associated with a milestone and whether the PR is associated with an issue. ",
+		Description: "The associate plugin is used to detect whether the issue is associated with a milestone and whether the PR is associated with an issue.",
 	}
 	pluginHelp.AddCommand(pluginhelp.Command{
 		Usage:       "/check-milestone",
@@ -75,7 +75,7 @@ func (m *associate) handleIssueEvent(e *sdk.IssueEvent, log *log.Entry) error {
 	if act == "open" {
 		return handleIssueCreate(m.ghc, e, log)
 	}
-	return handleIssueUpdate(m.ghc, e)
+	return nil
 }
 
 func (m *associate) handleNoteEvent(e *sdk.NoteEvent, log *log.Entry) error {
