@@ -217,9 +217,8 @@ func (c *client) GetPRLabels(org, repo string, number int) ([]sdk.Label, error) 
 			break
 		}
 
-		p += 1
-
 		r = append(r, ls...)
+		p++
 	}
 
 	return r, nil
@@ -242,8 +241,8 @@ func (c *client) ListPRComments(org, repo string, number int) ([]sdk.PullRequest
 			break
 		}
 
-		p += 1
 		r = append(r, cs...)
+		p++
 	}
 
 	return r, nil
@@ -262,8 +261,8 @@ func (c *client) ListPrIssues(org, repo string, number int32) ([] sdk.Issue, err
 		if len(iss) == 0 {
 			break
 		}
-		p += 1
 		issues = append(issues, iss...)
+		p++
 	}
 	return issues, nil
 }
@@ -372,7 +371,8 @@ func (c *client) IsMember(org, login string) (bool, error) {
 func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error) {
 	var r github.SingleCommit
 
-	v, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCommitsSha(context.Background(), org, repo, SHA, nil)
+	v, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCommitsSha(
+		context.Background(), org, repo, SHA, nil)
 	if err != nil {
 		return r, formatErr(err, "get commit info")
 	}
@@ -421,8 +421,8 @@ func (c *client) AddIssueLabel(org, repo, number, label string) error {
 
 func (c *client) RemoveIssueLabel(org, repo, number, label string) error {
 	label = strings.Replace(label, "/", "%2F", -1)
-	_, err := c.ac.LabelsApi.DeleteV5ReposOwnerRepoIssuesNumberLabelsName(context.Background(), org, repo, number,
-		label, nil)
+	_, err := c.ac.LabelsApi.DeleteV5ReposOwnerRepoIssuesNumberLabelsName(
+		context.Background(), org, repo, number, label, nil)
 	return formatErr(err, "rm issue label")
 }
 
