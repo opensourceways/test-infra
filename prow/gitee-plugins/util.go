@@ -166,3 +166,14 @@ func convertPullRequestLabel(e *gitee.PullRequestEvent) []github.Label {
 	*/
 	return []github.Label{}
 }
+
+//HasLabel checks if label is in the label set "labels".
+func HasLabel(label string, labels []gitee.Label) bool {
+	for _, l := range labels {
+		if strings.ToLower(l.Name) == strings.ToLower(label) {
+			return true
+		}
+	}
+	return false
+}
+

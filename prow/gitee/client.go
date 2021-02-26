@@ -440,6 +440,17 @@ func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []str
 	return formatErr(err, "replace pr labels")
 }
 
+func (c *client) GetIssueLabels(org, repo, number string) ([]sdk.Label, error) {
+	labels, _, err := c.ac.LabelsApi.GetV5ReposOwnerRepoIssuesNumberLabels(
+		context.Background(), org, repo, number, nil)
+	return labels, formatErr(err, "get issue labels")
+}
+
+func (c *client) GetRepoLabels(owner, repo string) ([]sdk.Label, error) {
+	labels, _, err := c.ac.LabelsApi.GetV5ReposOwnerRepoLabels(context.Background(), owner, repo, nil)
+	return labels, formatErr(err, "get repo labels")
+}
+
 func formatErr(err error, doWhat string) error {
 	if err == nil {
 		return err
