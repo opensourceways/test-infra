@@ -16,7 +16,7 @@ type associate struct {
 	ghc             gitee.Client
 }
 
-//NewAssociate create a milestone plugin by config and gitee client
+//NewAssociate create a associate plugin by config and gitee client
 func NewAssociate(f plugins.GetPluginConfig, gec gitee.Client) plugins.Plugin {
 	return &associate{
 		getPluginConfig: f,
@@ -87,14 +87,14 @@ func (m *associate) handleNoteEvent(e *sdk.NoteEvent, log *log.Entry) error {
 		log.Debug("Event is not a creation of a comment, skipping.")
 		return nil
 	}
-
-	if *(e.NoteableType) == "Issue" {
+	switch *(e.NoteableType) {
+	case "Issue":
 		return handleIssueNoteEvent(m.ghc, e)
-	}
-	if *(e.NoteableType) == "PullRequest" {
+	case "PullRequest":
 		return handlePrComment(m.ghc, e)
+	default:
+		return nil
 	}
-	return nil
 }
 
 func (m *associate) handlePREvent(e *sdk.PullRequestEvent, log *log.Entry) error {
