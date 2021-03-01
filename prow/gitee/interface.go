@@ -12,6 +12,7 @@ type Client interface {
 	CreatePullRequest(org, repo, title, body, head, base string, canModify bool) (sdk.PullRequest, error)
 	GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]sdk.PullRequest, error)
 	UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error)
+	GetPullRequestOperateLogs(org, repo string, number int32) ([]sdk.OperateLog, error)
 
 	ListCollaborators(org, repo string) ([]github.User, error)
 	GetRef(org, repo, ref string) (string, error)

@@ -127,6 +127,12 @@ func (c *client) GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]s
 	return r, nil
 }
 
+func (c *client) GetPullRequestOperateLogs(org, repo string, number int32) ([]sdk.OperateLog, error) {
+	logs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberOperateLogs(
+		context.Background(), org, repo, number, nil)
+	return logs, formatErr(err, "get PR operated log")
+}
+
 func (c *client) UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error) {
 	pr, _, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsNumber(context.Background(), org, repo, number, param)
 	return pr, formatErr(err, "update pull request")

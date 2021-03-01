@@ -37,6 +37,7 @@ type giteeClient interface {
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
 
 	UpdatePullRequest(org, repo string, number int32, title, body, state, labels string) (sdk.PullRequest, error)
+	GetPullRequestOperateLogs(org, repo string, number int32) ([]sdk.OperateLog, error)
 }
 
 type label struct {
