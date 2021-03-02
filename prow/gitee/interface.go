@@ -27,6 +27,8 @@ type Client interface {
 
 	AssignPR(owner, repo string, number int, logins []string) error
 	UnassignPR(owner, repo string, number int, logins []string) error
+	GetPRCommits(org, repo string, number int) ([]sdk.PullRequestCommits, error)
+
 	AssignGiteeIssue(org, repo string, number string, login string) error
 	UnassignGiteeIssue(org, repo string, number string, login string) error
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error

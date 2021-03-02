@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -32,7 +33,7 @@ func NewCLA(f plugins.GetPluginConfig, gec giteeClient) plugins.Plugin {
 	}
 }
 
-func (this *cla) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
+func (cl *cla) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
 	pluginHelp := &pluginhelp.PluginHelp{
 		Description: "The cla plugin manages the application and removal of the cla labels on pull requests. It is also responsible for warning unauthorized PR authors that they need to sign the cla before their PR will be merged.",
 	}
@@ -46,21 +47,21 @@ func (this *cla) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, e
 	return pluginHelp, nil
 }
 
-func (this *cla) PluginName() string {
+func (cl *cla) PluginName() string {
 	return "cla"
 }
 
-func (this *cla) NewPluginConfig() plugins.PluginConfig {
+func (cl *cla) NewPluginConfig() plugins.PluginConfig {
 	return &configuration{}
 }
 
-func (this *cla) RegisterEventHandler(p plugins.Plugins) {
-	name := this.PluginName()
-	p.RegisterNoteEventHandler(name, this.handleNoteEvent)
-	p.RegisterPullRequestHandler(name, this.handlePullRequestEvent)
+func (cl *cla) RegisterEventHandler(p plugins.Plugins) {
+	name := cl.PluginName()
+	p.RegisterNoteEventHandler(name, cl.handleNoteEvent)
+	p.RegisterPullRequestHandler(name, cl.handlePullRequestEvent)
 }
 
-func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
+func (cl *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	funcStart := time.Now()
 	defer func() {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
@@ -84,12 +85,17 @@ func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	org := e.Repository.Namespace
 	repo := e.Repository.Path
 
-	cfg, err := this.orgRepoConfig(org, repo)
+	cfg, err := cl.orgRepoConfig(org, repo)
 	if err != nil {
 		return err
 	}
 
-	signed, err := isSigned(pr.Head.User.Email, cfg.CheckURL)
+	prNumber := int(pr.Number)
+	commits, err := cl.getPrCommits(org, repo, prNumber)
+	if err != nil {
+		return err
+	}
+	unSigns, signed, err := checkCommitsSigned(commits, cfg.CheckURL)
 	if err != nil {
 		return err
 	}
@@ -105,39 +111,37 @@ func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		}
 	}
 
-	prNumber := int(pr.Number)
-
 	if signed {
 		if hasCLANo {
-			if err := this.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
+			if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
 				log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelNo)
 			}
 		}
 
 		if !hasCLAYes {
-			if err := this.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
+			if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
 				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
 			}
 		}
-		this.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.Head.User.Login))
+		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.Head.User.Login))
 	} else {
 		if hasCLAYes {
-			if err := this.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
+			if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
 				log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelYes)
 			}
 		}
 
 		if !hasCLANo {
-			if err := this.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
+			if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
 				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
 			}
 		}
-		this.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee"))
+		cInf := generateUnSignComment(unSigns, commits)
+		return cl.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee", cInf))
 	}
-	return nil
 }
 
-func (this *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
+func (cl *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
 	funcStart := time.Now()
 	defer func() {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handlePullRequest")
@@ -157,48 +161,49 @@ func (this *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Ent
 	org := pr.Base.Repo.Namespace
 	repo := pr.Base.Repo.Path
 
-	cfg, err := this.orgRepoConfig(org, repo)
+	cfg, err := cl.orgRepoConfig(org, repo)
 	if err != nil {
 		return err
 	}
-
-	signed, err := isSigned(pr.Head.User.Email, cfg.CheckURL)
-	if err != nil {
-		return err
-	}
-
 	prNumber := int(pr.Number)
+	commits, err := cl.getPrCommits(org, repo, prNumber)
+	if err != nil {
+		return err
+	}
+	unSigns, signed, err := checkCommitsSigned(commits, cfg.CheckURL)
+	if err != nil {
+		return err
+	}
 	if signed {
-		if err := this.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
+		if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
 			log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
 		}
 		return nil
 	}
 
-	if err := this.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
+	if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
 		log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
 	}
-
-	this.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee"))
-	return nil
+	cInf := generateUnSignComment(unSigns, commits)
+	return cl.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee", cInf))
 }
 
-func (this *cla) orgRepoConfig(org, repo string) (*pluginConfig, error) {
-	cfg, err := this.pluginConfig()
+func (cl *cla) orgRepoConfig(org, repo string) (*pluginConfig, error) {
+	cfg, err := cl.pluginConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	pc := cfg.CLAFor(org, repo)
 	if pc == nil {
-		return nil, fmt.Errorf("no cla plugin config for this repo:%s/%s", org, repo)
+		return nil, fmt.Errorf("no cla plugin config for cl repo:%s/%s", org, repo)
 	}
 
 	return pc, nil
 }
 
-func (this *cla) pluginConfig() (*configuration, error) {
-	c := this.getPluginConfig(this.PluginName())
+func (cl *cla) pluginConfig() (*configuration, error) {
+	c := cl.getPluginConfig(cl.PluginName())
 	if c == nil {
 		return nil, fmt.Errorf("can't find the configuration")
 	}
@@ -209,6 +214,48 @@ func (this *cla) pluginConfig() (*configuration, error) {
 	}
 
 	return c1, nil
+}
+
+func (cl *cla) getPrCommits(org, repo string, number int) (map[string][]sdk.PullRequestCommits, error) {
+	cos := make(map[string][]sdk.PullRequestCommits, 0)
+	commits, err := cl.ghc.GetCommits(org, repo, number)
+	if err != nil {
+		return cos, err
+	}
+	for _, v := range commits {
+		if v.Commit == nil || v.Commit.Author == nil {
+			continue
+		}
+		if _, ok := cos[v.Commit.Author.Email]; !ok {
+			var cv []sdk.PullRequestCommits
+			cv = append(cv, v)
+			cos[v.Commit.Author.Email] = cv
+		} else {
+			cos[v.Commit.Author.Email] = append(cos[v.Commit.Author.Email], v)
+		}
+	}
+	return cos, err
+}
+
+//checkCommitsSigned Check whether all the commit authors of the PR have signed cla. return:
+//- Authors who have not signed cla
+//- Has everyone signed the CLA
+//- Check the CLA for errors
+func checkCommitsSigned(commits map[string][]sdk.PullRequestCommits, checkUrl string) ([]string, bool, error) {
+	if len(commits) == 0 {
+		return nil, false, fmt.Errorf("commits is empty, cla cannot be checked")
+	}
+	var unCheck []string
+	for k := range commits {
+		signed, err := isSigned(k, checkUrl)
+		if err != nil {
+			return unCheck, false, err
+		}
+		if !signed {
+			unCheck = append(unCheck, k)
+		}
+	}
+	return unCheck, len(unCheck) == 0, nil
 }
 
 func isSigned(email, url string) (bool, error) {
@@ -241,10 +288,25 @@ func isSigned(email, url string) (bool, error) {
 	return v.Data.Signed, nil
 }
 
-func signGuide(signURL, platform string) string {
+func generateUnSignComment(unSigns []string, commits map[string][]sdk.PullRequestCommits) string {
+
+	if len(unSigns) == 1 {
+		return fmt.Sprintf("The author(%s) need to sign cla.", commits[unSigns[0]][0].Commit.Author.Name)
+	} else {
+		var cs []string
+		for _, v := range unSigns {
+			tpl := "The author(%s) of commit [%s](%s) need to sign cla."
+			com := commits[v][0]
+			cs = append(cs, fmt.Sprintf(tpl, com.Commit.Author.Name, com.Sha[:8], com.HtmlUrl))
+		}
+		return fmt.Sprintf("\n %s \n", strings.Join(cs, "\n"))
+	}
+}
+
+func signGuide(signURL, platform, cInfo string) string {
 	s := `Thanks for your pull request. Before we can look at your pull request, you'll need to sign a Contributor License Agreement (CLA).
 
-:memo: **Please access [here](%s) to sign the CLA.**
+:memo: %s **Please access [here](%s) to sign the CLA.**
 
 It may take a couple minutes for the CLA signature to be fully registered; after that, please reply here with a new comment: **/check-cla** to verify. Thanks.
 
@@ -255,7 +317,7 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 - If you have done the above and are still having issues with the CLA being reported as unsigned, please feel free to file an issue.
 	`
 
-	return fmt.Sprintf(s, signURL, platform)
+	return fmt.Sprintf(s, cInfo, signURL, platform)
 }
 
 func alreadySigned(user string) string {

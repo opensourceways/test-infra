@@ -317,6 +317,12 @@ func (c *client) UnassignPR(org, repo string, number int, logins []string) error
 	return formatErr(err, "unassign reviewer from pr")
 }
 
+func (c *client) GetPRCommits(org, repo string, number int) ([]sdk.PullRequestCommits, error) {
+	commits, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberCommits(
+		context.Background(), org, repo, int32(number), nil)
+	return commits, err
+}
+
 func (c *client) AssignGiteeIssue(org, repo string, number string, login string) error {
 	opt := sdk.IssueUpdateParam{
 		Repo:     repo,
