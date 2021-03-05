@@ -160,6 +160,7 @@ func (cl *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry
 	if err != nil {
 		return err
 	}
+
 	prNumber := int(pr.Number)
 	cInf, signed, err := cl.getPrCommitsAbout(org, repo, prNumber, cfg.CheckURL)
 	if err != nil {
@@ -186,7 +187,7 @@ func (cl *cla) orgRepoConfig(org, repo string) (*pluginConfig, error) {
 
 	pc := cfg.CLAFor(org, repo)
 	if pc == nil {
-		return nil, fmt.Errorf("no cla plugin config for cl repo:%s/%s", org, repo)
+		return nil, fmt.Errorf("no cla plugin config for this repo:%s/%s", org, repo)
 	}
 
 	return pc, nil
@@ -207,19 +208,19 @@ func (cl *cla) pluginConfig() (*configuration, error) {
 }
 
 func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) (string, bool, error) {
-	cos := make(map[string][]sdk.PullRequestCommits, 0)
+	cos := map[string]*sdk.PullRequestCommits{}
 	commits, err := cl.ghc.GetCommits(org, repo, number)
 	if err != nil {
 		return "", false, err
 	}
-	for _, v := range commits {
+	for i := range commits {
+		v := commits[i]
 		if v.Commit == nil || v.Commit.Author == nil {
 			continue
 		}
-		if _, ok := cos[v.Commit.Author.Email]; !ok {
-			cos[v.Commit.Author.Email] = []sdk.PullRequestCommits{v}
-		} else {
-			cos[v.Commit.Author.Email] = append(cos[v.Commit.Author.Email], v)
+		email := v.Commit.Author.Email
+		if _, ok := cos[email]; !ok {
+			cos[email] = &v
 		}
 	}
 	unSigns, signed, err := checkCommitsSigned(cos, checkURL)
@@ -230,7 +231,7 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 	return comment, signed, err
 }
 
-func checkCommitsSigned(commits map[string][]sdk.PullRequestCommits, checkURL string) ([]string, bool, error) {
+func checkCommitsSigned(commits map[string]*sdk.PullRequestCommits, checkURL string) ([]string, bool, error) {
 	if len(commits) == 0 {
 		return nil, false, fmt.Errorf("commits is empty, cla cannot be checked")
 	}
@@ -277,14 +278,14 @@ func isSigned(email, url string) (bool, error) {
 	return v.Data.Signed, nil
 }
 
-func generateUnSignComment(unSigns []string, commits map[string][]sdk.PullRequestCommits) string {
+func generateUnSignComment(unSigns []string, commits map[string]*sdk.PullRequestCommits) string {
 	if len(unSigns) == 1 {
-		return fmt.Sprintf("The author(**%s**) need to sign cla.", commits[unSigns[0]][0].Commit.Author.Name)
+		return fmt.Sprintf("The author(**%s**) need to sign cla.", commits[unSigns[0]].Commit.Author.Name)
 	}
 	cs := make([]string, 0, len(unSigns))
 	for _, v := range unSigns {
 		tpl := "The author(**%s**) of commit [%s](%s) need to sign cla."
-		com := commits[v][0]
+		com := commits[v]
 		cs = append(cs, fmt.Sprintf(tpl, com.Commit.Author.Name, com.Sha[:8], com.HtmlUrl))
 	}
 	return strings.Join(cs, "\n")
