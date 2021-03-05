@@ -11,8 +11,8 @@ type configuration struct {
 	CLA []pluginConfig `json:"cla,omitempty"`
 }
 
-func (this *configuration) Validate() error {
-	_, err := golangsdk.BuildRequestBody(this, "")
+func (c *configuration) Validate() error {
+	_, err := golangsdk.BuildRequestBody(c, "")
 	return err
 }
 

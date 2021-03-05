@@ -320,7 +320,7 @@ func (c *client) UnassignPR(org, repo string, number int, logins []string) error
 func (c *client) GetPRCommits(org, repo string, number int) ([]sdk.PullRequestCommits, error) {
 	commits, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberCommits(
 		context.Background(), org, repo, int32(number), nil)
-	return commits, err
+	return commits, formatErr(err, "get pr commits")
 }
 
 func (c *client) AssignGiteeIssue(org, repo string, number string, login string) error {
