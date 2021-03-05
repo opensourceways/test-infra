@@ -214,13 +214,13 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 		return "", false, err
 	}
 	for i := range commits {
-		v := commits[i]
+		v := &commits[i]
 		if v.Commit == nil || v.Commit.Author == nil {
 			continue
 		}
 		email := v.Commit.Author.Email
 		if _, ok := cos[email]; !ok {
-			cos[email] = &v
+			cos[email] = v
 		}
 	}
 	unSigns, signed, err := checkCommitsSigned(cos, checkURL)
