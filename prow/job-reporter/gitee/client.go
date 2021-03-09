@@ -3,12 +3,13 @@ package gitee
 import (
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"regexp"
 	"sort"
 	"strconv"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/github/report"
@@ -108,7 +109,7 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 	}
 	// find the old comment even if it is not for the current commit in order to
 	// write the comment at the fixed position.
-	jobsOldComment, oldSha, commentId := jsc.FindCheckResultComment(botname, comments)
+	jobsOldComment, oldSha, commentID := jsc.FindCheckResultComment(botname, comments)
 
 	desc := jsc.GenJobResultComment(jobsOldComment, oldSha, ref, s)
 	status := jsc.ParseCommentToStatus(desc)
@@ -120,7 +121,7 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 	if oldSha == "" {
 		return c.CreatePRComment(org, repo, prNumber, desc)
 	}
-	return c.UpdatePRComment(org, repo, commentId, desc)
+	return c.UpdatePRComment(org, repo, commentID, desc)
 }
 
 func (c *ghclient) updatePRLabel(org, repo string, number int32, labels []sdk.Label, status []github.Status) error {
