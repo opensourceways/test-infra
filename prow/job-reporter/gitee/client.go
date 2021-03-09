@@ -1,7 +1,9 @@
 package gitee
 
 import (
+	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"regexp"
 	"sort"
 	"strconv"
@@ -17,6 +19,7 @@ var (
 	jobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf("\\| Check Name \\| Result \\| Details \\|\n\\| --- \\| --- \\| --- \\|\n%s\n  <details>Git tree hash: %s</details>", "([\\s\\S]*)", "(.*)"))
 	jobResultNotification    = "| %s %s | %s | [details](%s) |"
 	jobResultEachPartRe      = regexp.MustCompile(fmt.Sprintf("\\| %s %s \\| %s \\| \\[details\\]\\(%s\\) \\|", "(.*)", "(.*)", "(.*)", "(.*)"))
+	jobStatusLabelRe         = regexp.MustCompile(`(?mi)^ci/test-(error|failure|pending|success)\s*$`)
 )
 
 type giteeClient interface {
@@ -26,6 +29,7 @@ type giteeClient interface {
 	DeletePRComment(org, repo string, ID int) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
 	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
+	UpdatePullRequest(org, repo string, number int32, title, body, state, labels string) (sdk.PullRequest, error)
 }
 
 var _ report.GitHubClient = (*ghclient)(nil)
@@ -107,12 +111,46 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 	jobsOldComment, oldSha, commentId := jsc.FindCheckResultComment(botname, comments)
 
 	desc := jsc.GenJobResultComment(jobsOldComment, oldSha, ref, s)
+	status := jsc.ParseCommentToStatus(desc)
 
+	if err := c.updatePRLabel(org, repo, int32(prNumber), pr.Labels, status); err != nil {
+		return err
+	}
 	// oldSha == "" means there is not status comment exist.
 	if oldSha == "" {
 		return c.CreatePRComment(org, repo, prNumber, desc)
 	}
 	return c.UpdatePRComment(org, repo, commentId, desc)
+}
+
+func (c *ghclient) updatePRLabel(org, repo string, number int32, labels []sdk.Label, status []github.Status) error {
+	labelSet := sets.String{}
+	for _, v := range labels {
+		if !jobStatusLabelRe.MatchString(v.Name) {
+			labelSet.Insert(v.Name)
+		}
+	}
+	statusSet := sets.String{}
+	for _, s := range status {
+		statusSet.Insert(s.State)
+	}
+	var sLabel string
+	if statusSet.Has(github.StatusError) {
+		sLabel = "ci/test-error"
+	} else if statusSet.Has(github.StatusFailure) {
+		sLabel = "ci/test-failure"
+	} else if statusSet.Has(github.StatusPending) {
+		sLabel = "ci/test-pending"
+	} else {
+		sLabel = "ci/test-success"
+	}
+	labelSet.Insert(sLabel)
+	lb, err := json.Marshal(labelSet.List())
+	if err != nil {
+		return err
+	}
+	_, err = c.UpdatePullRequest(org, repo, number, "", "", "", string(lb))
+	return err
 }
 
 func parsePRNumber(org, repo string, s github.Status) (int, error) {
