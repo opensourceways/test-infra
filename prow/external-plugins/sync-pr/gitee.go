@@ -53,7 +53,7 @@ func (s *server) submitPR(spr *github.PullRequest, destOrg, repo, head string) (
 	}
 
 	if strings.Compare(dpr.Body, body) != 0 {
-		_, err = s.gec.UpdatePullRequest(destOrg, repo, dpr.Number, "", body, "", "")
+		_, err = s.gec.UpdatePullRequest(destOrg, repo, dpr.Number, sdk.PullRequestUpdateParam{Body:body})
 		if err != nil {
 			return nil, err
 		}

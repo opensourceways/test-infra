@@ -46,7 +46,7 @@ type githubClient interface {
 type giteeClient interface {
 	BotName() (string, error)
 	CreatePullRequest(org, repo, title, body, head, base string, canModify bool) (sdk.PullRequest, error)
-	UpdatePullRequest(org, repo string, number int32, title, body, state, labels string) (sdk.PullRequest, error)
+	UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error)
 	GetPullRequests(org, repo string, opts gitee.ListPullRequestOpt) ([]sdk.PullRequest, error)
 }
 
