@@ -215,12 +215,29 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 	}
 	for i := range commits {
 		v := &commits[i]
-		if v.Commit == nil || v.Commit.Committer == nil {
+		if v.Commit == nil {
 			continue
 		}
-		email := v.Commit.Committer.Email
-		if (email == "noreply@gitee.com" || v.Commit.Committer.Name == "Gitee") && v.Commit.Author != nil{
-			email = v.Commit.Author.Email
+
+		email := ""
+		if v.Commit.Committer != nil {
+			email = v.Committer.Email
+		}
+		if email == "" || email == "noreply@gitee.com" {
+			if v.Commit.Author == nil {
+				email = ""
+			} else {
+				email = v.Commit.Author.Email
+			}
+		}
+		if email == "" {
+			comment := fmt.Sprintf(
+				"commit [%s](%s) cannot sign cla with an illegal email address:%s. ", v.Sha[:8], v.HtmlUrl, email)
+			err = cl.ghc.CreateComment(org, repo, number, comment)
+			if err == nil {
+				err = fmt.Errorf(comment)
+			}
+			return "", false, err
 		}
 		if _, ok := cos[email]; !ok {
 			cos[email] = v
@@ -306,7 +323,6 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 
 ---
 
-- Please, firstly see the [FAQ](https://github.com/opensourceways/test-infra/blob/sync-5-22/prow/gitee-plugins/cla/faq.md) to help you handle the problem.
 - If you've already signed a CLA, it's possible you're using a different email address for your %s account. Check your existing CLA data and verify the email. 
 - If you signed the CLA as an employee or a member of an organization, please contact your corporation or organization to verify you have been activated to start contributing.
 - If you have done the above and are still having issues with the CLA being reported as unsigned, please feel free to file an issue.
@@ -319,4 +335,3 @@ func alreadySigned(user string) string {
 	s := `***@%s***, thanks for your pull request. You've already signed CLA successfully. :wave: `
 	return fmt.Sprintf(s, user)
 }
-
