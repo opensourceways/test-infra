@@ -218,17 +218,14 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 		if v.Commit == nil {
 			continue
 		}
-
-		email := ""
-		if v.Commit.Committer != nil {
-			email = v.Committer.Email
+		committer := v.Commit.Committer
+		author := v.Commit.Author
+		if committer == nil || author == nil {
+			return "", false, fmt.Errorf("the commit %s not have commiter or author", v.Sha)
 		}
-		if email == "" || email == "noreply@gitee.com" {
-			if v.Commit.Author == nil {
-				email = ""
-			} else {
-				email = v.Commit.Author.Email
-			}
+		email := committer.Email
+		if email == "noreply@gitee.com" || committer.Name == "Gitee" {
+			email = v.Commit.Author.Email
 		}
 		if email == "" {
 			comment := fmt.Sprintf(
