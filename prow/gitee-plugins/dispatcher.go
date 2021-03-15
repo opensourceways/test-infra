@@ -99,6 +99,13 @@ func (d *dispatcher) Wait() {
 }
 
 func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h http.Header) error {
+
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println("recover exception:", err, string(payload))
+		}
+	}()
+
 	l := logrus.WithFields(
 		logrus.Fields{
 			"event-type":     eventType,
