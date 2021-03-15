@@ -99,13 +99,6 @@ func (d *dispatcher) Wait() {
 }
 
 func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h http.Header) error {
-
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println("recover exception:", err, string(payload))
-		}
-	}()
-
 	l := logrus.WithFields(
 		logrus.Fields{
 			"event-type":     eventType,
@@ -120,6 +113,9 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 		if err := json.Unmarshal(payload, &e); err != nil {
 			return err
 		}
+		if e.Repository == nil {
+			return fmt.Errorf("event repository is empty,payload: %s",string(payload))
+		}
 		srcRepo = e.Repository.FullName
 		d.wg.Add(1)
 		go d.handleNoteEvent(&e, l)
@@ -128,6 +124,9 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 		var ie gitee.IssueEvent
 		if err := json.Unmarshal(payload, &ie); err != nil {
 			return err
+		}
+		if ie.Repository == nil {
+			return fmt.Errorf("event repository is empty,payload: %s",string(payload))
 		}
 		srcRepo = ie.Repository.FullName
 		d.wg.Add(1)
@@ -138,6 +137,9 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 		if err := json.Unmarshal(payload, &pr); err != nil {
 			return err
 		}
+		if pr.Repository == nil {
+			return fmt.Errorf("event repository is empty,payload: %s",string(payload))
+		}
 		srcRepo = pr.Repository.FullName
 		d.wg.Add(1)
 		go d.handlePullRequestEvent(&pr, l)
@@ -146,6 +148,9 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 		var pe gitee.PushEvent
 		if err := json.Unmarshal(payload, &pe); err != nil {
 			return err
+		}
+		if pe.Repository == nil {
+			return fmt.Errorf("event repository is empty,payload: %s",string(payload))
 		}
 		srcRepo = pe.Repository.FullName
 		d.wg.Add(1)
