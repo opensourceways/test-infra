@@ -229,12 +229,9 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 		}
 		if email == "" {
 			comment := fmt.Sprintf(
-				"commit [%s](%s) cannot sign cla with an illegal email address:%s. ", v.Sha[:8], v.HtmlUrl, email)
-			err = cl.ghc.CreateComment(org, repo, number, comment)
-			if err == nil {
-				err = fmt.Errorf(comment)
-			}
-			return "", false, err
+				"The email address of author or commiter for commit [%s](%s) is empty. ", v.Sha[:8], v.HtmlUrl)
+			 _ = cl.ghc.CreateComment(org, repo, number, comment)
+			return "", false, fmt.Errorf(comment)
 		}
 		if _, ok := cos[email]; !ok {
 			cos[email] = v
