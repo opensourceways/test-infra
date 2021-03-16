@@ -43,6 +43,7 @@ type Client interface {
 	GetRepos(org string) ([]sdk.Project, error)
 	RemoveIssueLabel(org, repo, number, label string) error
 	AddIssueLabel(org, repo, number, label string) error
+	AddMultiIssueLabel(org, repo, number string, label []string) error
 }
 
 type ListPullRequestOpt struct {

@@ -425,6 +425,12 @@ func (c *client) AddIssueLabel(org, repo, number, label string) error {
 	return formatErr(err, "add issue label")
 }
 
+func (c *client) AddMultiIssueLabel(org, repo, number string, label []string) error {
+	opt := &sdk.PostV5ReposOwnerRepoIssuesNumberLabelsOpts{Body: optional.NewInterface(label)}
+	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(context.Background(), org, repo, number, opt)
+	return formatErr(err, "add issue label")
+}
+
 func (c *client) RemoveIssueLabel(org, repo, number, label string) error {
 	label = strings.Replace(label, "/", "%2F", -1)
 	_, err := c.ac.LabelsApi.DeleteV5ReposOwnerRepoIssuesNumberLabelsName(
