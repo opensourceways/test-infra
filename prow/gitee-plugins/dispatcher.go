@@ -98,29 +98,6 @@ func (d *dispatcher) Wait() {
 	d.wg.Wait() // Handle remaining requests
 }
 
-func (d *dispatcher) parsePayload(payload []byte, v interface{}) error {
-	if err := json.Unmarshal(payload, v); err != nil {
-		return err
-	}
-	var rep *gitee.ProjectHook
-	switch t := v.(type) {
-	case *gitee.NoteEvent:
-		rep = t.Repository
-	case *gitee.IssueEvent:
-		rep = t.Repository
-	case *gitee.PullRequestEvent:
-		rep = t.Repository
-	case *gitee.PushEvent:
-		rep = t.Repository
-	default:
-		return fmt.Errorf("unexcept type for parse")
-	}
-	if rep == nil {
-		return fmt.Errorf("event repository is empty,payload: %s", string(payload))
-	}
-	return nil
-}
-
 func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h http.Header) error {
 	l := logrus.WithFields(
 		logrus.Fields{
@@ -133,9 +110,11 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 	switch eventType {
 	case "Note Hook":
 		var e gitee.NoteEvent
-		err := d.parsePayload(payload, &e)
-		if err != nil {
-			l.Error(err)
+		if err := json.Unmarshal(payload, &e); err != nil {
+			return err
+		}
+		if err := checkRepository(payload, e.Repository); err != nil {
+			return err
 		}
 		srcRepo = e.Repository.FullName
 		d.wg.Add(1)
@@ -143,9 +122,11 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 
 	case "Issue Hook":
 		var ie gitee.IssueEvent
-		err := d.parsePayload(payload, &ie)
-		if err != nil {
-			l.Error(err)
+		if err := json.Unmarshal(payload, &ie); err != nil {
+			return err
+		}
+		if err := checkRepository(payload, ie.Repository); err != nil {
+			return err
 		}
 		srcRepo = ie.Repository.FullName
 		d.wg.Add(1)
@@ -153,9 +134,11 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 
 	case "Merge Request Hook":
 		var pr gitee.PullRequestEvent
-		err := d.parsePayload(payload, &pr)
-		if err != nil {
-			l.Error(err)
+		if err := json.Unmarshal(payload, &pr); err != nil {
+			return err
+		}
+		if err := checkRepository(payload, pr.Repository); err != nil {
+			return err
 		}
 		srcRepo = pr.Repository.FullName
 		d.wg.Add(1)
@@ -163,9 +146,11 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 
 	case "Push Hook":
 		var pe gitee.PushEvent
-		err := d.parsePayload(payload, &pe)
-		if err != nil {
-			l.Error(err)
+		if err := json.Unmarshal(payload, &pe); err != nil {
+			return err
+		}
+		if err := checkRepository(payload, pe.Repository); err != nil {
+			return err
 		}
 		srcRepo = pe.Repository.FullName
 		d.wg.Add(1)
@@ -366,4 +351,11 @@ func (d *dispatcher) handleNoteEvent(e *gitee.NoteEvent, l *logrus.Entry) {
 			}
 		}(p, h)
 	}
+}
+
+func checkRepository(payload []byte, rep *gitee.ProjectHook) error {
+	if rep == nil {
+		return fmt.Errorf("event repository is empty,payload: %s", string(payload))
+	}
+	return nil
 }
