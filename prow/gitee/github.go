@@ -31,7 +31,7 @@ func ConvertGiteePR(v *sdk.PullRequest) *github.PullRequest {
 			Ref: v.Base.Ref,
 			SHA: v.Base.Sha,
 			Repo: github.Repo{
-				Name: v.Base.Repo.Name,
+				Name: v.Base.Repo.Path,
 				Owner: github.User{
 					Login: v.Base.Repo.Namespace.Path,
 				},

@@ -7,6 +7,8 @@ import (
 	"strconv"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/github/report"
@@ -17,6 +19,7 @@ var (
 	jobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf("\\| Check Name \\| Result \\| Details \\|\n\\| --- \\| --- \\| --- \\|\n%s\n  <details>Git tree hash: %s</details>", "([\\s\\S]*)", "(.*)"))
 	jobResultNotification    = "| %s %s | %s | [details](%s) |"
 	jobResultEachPartRe      = regexp.MustCompile(fmt.Sprintf("\\| %s %s \\| %s \\| \\[details\\]\\(%s\\) \\|", "(.*)", "(.*)", "(.*)", "(.*)"))
+	jobStatusLabelRe         = regexp.MustCompile(`^ci/test-(error|failure|pending|success)$`)
 )
 
 type giteeClient interface {
@@ -26,6 +29,7 @@ type giteeClient interface {
 	DeletePRComment(org, repo string, ID int) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
 	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
+	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
 }
 
 var _ report.GitHubClient = (*ghclient)(nil)
@@ -104,15 +108,50 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 	}
 	// find the old comment even if it is not for the current commit in order to
 	// write the comment at the fixed position.
-	jobsOldComment, oldSha, commentId := jsc.FindCheckResultComment(botname, comments)
+	jobsOldComment, oldSha, commentID := jsc.FindCheckResultComment(botname, comments)
 
 	desc := jsc.GenJobResultComment(jobsOldComment, oldSha, ref, s)
+	status := jsc.parseCommentToJobStatus(desc)
 
+	uErr := c.updatePRLabel(org, repo, int32(prNumber), pr.Labels, status)
 	// oldSha == "" means there is not status comment exist.
 	if oldSha == "" {
-		return c.CreatePRComment(org, repo, prNumber, desc)
+		err = c.CreatePRComment(org, repo, prNumber, desc)
+	}else {
+		err = c.UpdatePRComment(org, repo, commentID, desc)
 	}
-	return c.UpdatePRComment(org, repo, commentId, desc)
+	if uErr != nil || err != nil {
+		return fmt.Errorf("report job status label or comment error, label error: %v; comment error: %v", uErr, err)
+	}
+	return nil
+}
+
+func (c *ghclient) updatePRLabel(org, repo string, number int32, labels []sdk.Label, status []github.Status) error {
+	labelSet := sets.String{}
+	for _, v := range labels {
+		if !jobStatusLabelRe.MatchString(v.Name) {
+			labelSet.Insert(v.Name)
+		}
+	}
+	statusSet := sets.String{}
+	for _, s := range status {
+		statusSet.Insert(s.State)
+	}
+	labelSet.Insert(genLabelByJobStatus(statusSet))
+	return c.ReplacePRAllLabels(org, repo, int(number), labelSet.List())
+}
+
+func genLabelByJobStatus(statusSet sets.String) string {
+	if statusSet.Has(github.StatusError) {
+		return "ci/test-error"
+	}
+	if statusSet.Has(github.StatusFailure) {
+		return "ci/test-failure"
+	}
+	if statusSet.Has(github.StatusPending) {
+		return "ci/test-pending"
+	}
+	return "ci/test-success"
 }
 
 func parsePRNumber(org, repo string, s github.Status) (int, error) {

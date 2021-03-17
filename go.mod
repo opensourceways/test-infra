@@ -18,7 +18,7 @@ replace (
 
 require (
 	cloud.google.com/go v0.47.0
-	gitee.com/openeuler/go-gitee v0.0.0-20210201095646-fd9179920723
+	gitee.com/openeuler/go-gitee v0.0.0-20210324035702-6b6bb8bae08d
 	github.com/Azure/azure-sdk-for-go v38.0.0+incompatible
 	github.com/Azure/azure-storage-blob-go v0.8.0
 	github.com/Azure/go-autorest/autorest v0.9.6

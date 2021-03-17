@@ -18,7 +18,7 @@ type Client interface {
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
 	GetPRLabels(org, repo string, number int) ([]sdk.Label, error)
 	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
-	ListPrIssues(org, repo string, number int32) ([] sdk.Issue, error)
+	ListPrIssues(org, repo string, number int32) ([]sdk.Issue, error)
 	DeletePRComment(org, repo string, ID int) error
 	CreatePRComment(org, repo string, number int, comment string) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
@@ -32,6 +32,8 @@ type Client interface {
 	AssignGiteeIssue(org, repo string, number string, login string) error
 	UnassignGiteeIssue(org, repo string, number string, login string) error
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
+	UpdateGiteeIssueComment(org, repo string, commentID int, comment string) error
+	DeleteGiteeIssueComment(org, repo string, ID int) error
 
 	IsCollaborator(owner, repo, login string) (bool, error)
 	IsMember(org, login string) (bool, error)
@@ -44,6 +46,8 @@ type Client interface {
 	RemoveIssueLabel(org, repo, number, label string) error
 	AddIssueLabel(org, repo, number, label string) error
 	AddMultiIssueLabel(org, repo, number string, label []string) error
+
+	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
 }
 
 type ListPullRequestOpt struct {

@@ -248,7 +248,7 @@ func (c *client) ListPRComments(org, repo string, number int) ([]sdk.PullRequest
 	return r, nil
 }
 
-func (c *client) ListPrIssues(org, repo string, number int32) ([] sdk.Issue, error) {
+func (c *client) ListPrIssues(org, repo string, number int32) ([]sdk.Issue, error) {
 	var issues []sdk.Issue
 	p := int32(1)
 	opt := sdk.GetV5ReposOwnerRepoPullsNumberIssuesOpts{}
@@ -350,6 +350,18 @@ func (c *client) CreateGiteeIssueComment(org, repo string, number string, commen
 	return formatErr(err, "create issue comment")
 }
 
+func (c *client) DeleteGiteeIssueComment(org, repo string, ID int) error {
+	_, err := c.ac.IssuesApi.DeleteV5ReposOwnerRepoIssuesCommentsId(
+		context.Background(), org, repo, int32(ID), nil)
+	return formatErr(err, "delete comment of issue")
+}
+
+func (c *client) UpdateGiteeIssueComment(org, repo string, commentID int, comment string) error {
+	_, _, err := c.ac.IssuesApi.PatchV5ReposOwnerRepoIssuesCommentsId(
+		context.Background(), org, repo, int32(commentID), comment, nil)
+	return formatErr(err, "update comment of issue")
+}
+
 func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
 	v, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaboratorsUsername(
 		context.Background(), owner, repo, login, nil)
@@ -420,14 +432,16 @@ func (c *client) GetRepos(org string) ([]sdk.Project, error) {
 }
 
 func (c *client) AddIssueLabel(org, repo, number, label string) error {
-	opt := &sdk.PostV5ReposOwnerRepoIssuesNumberLabelsOpts{Body: optional.NewInterface([]string{label})}
-	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(context.Background(), org, repo, number, opt)
+	opt := sdk.PullRequestLabelPostParam{Body: []string{label}}
+	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(
+		context.Background(), org, repo, number, opt)
 	return formatErr(err, "add issue label")
 }
 
 func (c *client) AddMultiIssueLabel(org, repo, number string, label []string) error {
-	opt := &sdk.PostV5ReposOwnerRepoIssuesNumberLabelsOpts{Body: optional.NewInterface(label)}
-	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(context.Background(), org, repo, number, opt)
+	opt := sdk.PullRequestLabelPostParam{Body: label}
+	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(
+		context.Background(), org, repo, number, opt)
 	return formatErr(err, "add issue label")
 }
 
@@ -436,6 +450,12 @@ func (c *client) RemoveIssueLabel(org, repo, number, label string) error {
 	_, err := c.ac.LabelsApi.DeleteV5ReposOwnerRepoIssuesNumberLabelsName(
 		context.Background(), org, repo, number, label, nil)
 	return formatErr(err, "rm issue label")
+}
+
+func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []string) error {
+	opt := sdk.PullRequestLabelPostParam{Body: labels}
+	_, _, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberLabels(context.Background(), owner, repo, int32(number), opt)
+	return formatErr(err, "replace pr labels")
 }
 
 func formatErr(err error, doWhat string) error {
