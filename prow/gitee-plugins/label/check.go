@@ -18,7 +18,7 @@ func (l *label) handleCheckLimitLabel(e *sdk.PullRequestEvent, log *logrus.Entry
 	if len(liLabel) == 0 {
 		return nil
 	}
-	needCheck := getLabelIntersection(e.PullRequest.Labels, liLabel)
+	needCheck := getIntersectionLabels(e.PullRequest.Labels, liLabel)
 	if len(needCheck) == 0 {
 		return nil
 	}
@@ -29,7 +29,7 @@ func (l *label) handleCheckLimitLabel(e *sdk.PullRequestEvent, log *logrus.Entry
 	if len(clLabel) == 0 {
 		return nil
 	}
-	upLabel := getNeedUpdateLabels(e.PullRequest.Labels, clLabel)
+	upLabel := getDifferenceLabels(e.PullRequest.Labels, clLabel)
 	strLabel := strings.Join(upLabel, ",")
 	org := e.Repository.Namespace
 	repo := e.Repository.Path
@@ -50,14 +50,14 @@ func (l *label) handleClearLabel(e *sdk.PullRequestEvent, log *logrus.Entry) err
 	}
 	cll := cfg.Label.ClearLabels
 	if len(cll) == 0 {
-		log.Info("No labels to be cleared are configured when PR source branch has changed")
+		log.Debug("No labels to be cleared are configured when PR source branch has changed")
 		return nil
 	}
-	needClear := getLabelIntersection(e.PullRequest.Labels, cll)
+	needClear := getIntersectionLabels(e.PullRequest.Labels, cll)
 	if len(needClear) == 0 {
 		return nil
 	}
-	needUpdate := getNeedUpdateLabels(e.PullRequest.Labels, needClear)
+	needUpdate := getDifferenceLabels(e.PullRequest.Labels, needClear)
 	strLabel := strings.Join(needUpdate, ",")
 	org := e.Repository.Namespace
 	repo := e.Repository.Path
@@ -93,30 +93,20 @@ func (l *label) getAuthorAddLabels(e *sdk.PullRequestEvent, checkLabels []string
 	return clearLabels, nil
 }
 
-func getLabelIntersection(labels []sdk.LabelHook, labels2 []string) []string {
-	var iLabels []string
-	labelSets := sets.String{}
+func getIntersectionLabels(labels []sdk.LabelHook, labels2 []string) []string {
+	s1 := sets.String{}
 	for _, l := range labels {
-		labelSets.Insert(l.Name)
+		s1.Insert(l.Name)
 	}
-	for _, v := range labels2 {
-		if labelSets.Has(v) {
-			iLabels = append(iLabels, v)
-		}
-	}
-	return iLabels
+	s2 := sets.NewString(labels2...)
+	return s1.Intersection(s2).List()
 }
 
-func getNeedUpdateLabels(labels []sdk.LabelHook, cLabels []string) []string {
-	labelSets := sets.String{}
+func getDifferenceLabels(labels []sdk.LabelHook, cLabels []string) []string {
+	s1 := sets.String{}
 	for _, l := range labels {
-		labelSets.Insert(l.Name)
+		s1.Insert(l.Name)
 	}
-
-	for _, v := range cLabels {
-		if labelSets.Has(v) {
-			labelSets.Delete(v)
-		}
-	}
-	return labelSets.List()
+	s2 := sets.NewString(cLabels...)
+	return s1.Difference(s2).List()
 }

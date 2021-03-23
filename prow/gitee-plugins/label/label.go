@@ -2,6 +2,7 @@ package label
 
 import (
 	"fmt"
+	"k8s.io/test-infra/prow/github"
 	"regexp"
 	"strings"
 
@@ -16,8 +17,8 @@ import (
 
 var (
 	defaultLabels          = []string{"kind", "priority", "sig"}
-	labelRegex             = regexp.MustCompile(`(?m)^/(area|committee|kind|language|priority|sig|triage|wg)\s*(.*?)\s*$`)
-	removeLabelRegex       = regexp.MustCompile(`(?m)^/remove-(area|committee|kind|language|priority|sig|triage|wg)\s*(.*?)\s*$`)
+	labelRegex             = regexp.MustCompile(`(?m)^/(kind|priority|sig)\s*(.*?)\s*$`)
+	removeLabelRegex       = regexp.MustCompile(`(?m)^/remove-(kind|priority|sig)\s*(.*?)\s*$`)
 	customLabelRegex       = regexp.MustCompile(`(?m)^/label\s*(.*?)\s*$`)
 	customRemoveLabelRegex = regexp.MustCompile(`(?m)^/remove-label\s*(.*?)\s*$`)
 )
@@ -52,22 +53,21 @@ func NewLabel(f plugins.GetPluginConfig, gec giteeClient) plugins.Plugin {
 func (l *label) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
 	var labels []string
 	labels = append(labels, defaultLabels...)
-	cfg, err := l.getLabelCfg()
-	if err == nil {
+	if cfg, err := l.getLabelCfg(); err == nil {
 		labels = append(labels, cfg.Label.AdditionalLabels...)
 	}
 	pluginHelp := &pluginhelp.PluginHelp{
-		Description: "The label plugin provides commands that add or remove certain types of labels. Labels of the following types can be manipulated: 'area/*', 'committee/*', 'kind/*', 'language/*', 'priority/*', 'sig/*', 'triage/*', and 'wg/*'. More labels can be configured to be used via the /label command.",
+		Description: "The label plugin provides commands that add or remove certain types of labels. Labels of the following types can be manipulated: 'kind/*', 'priority/*', 'sig/*'. More labels can be configured to be used via the /label command.",
 		Config: map[string]string{
 			"": configString(labels),
 		},
 	}
 	pluginHelp.AddCommand(pluginhelp.Command{
-		Usage:       "/[remove-](area|committee|kind|language|priority|sig|triage|wg|label) <target>",
+		Usage:       "/[remove-](kind|priority|sig|label) <target>",
 		Description: "Applies or removes a label from one of the recognized types of labels.",
 		Featured:    false,
 		WhoCanUse:   "Anyone can trigger this command on a PR.",
-		Examples:    []string{"/kind bug", "/remove-area prow", "/sig testing", "/language zh", "/label foo-bar-baz"},
+		Examples:    []string{"/kind bug", "/sig testing", "/label foo-bar-baz"},
 	})
 	return pluginHelp, nil
 }
@@ -115,27 +115,31 @@ func (l *label) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		log.Debug("not support note type")
 		return nil
 	}
-	return l.handleGenericCommentEvent(e, log, isPr)
+	var action noteEventAction
+	if isPr {
+		action = &PRNoteAction{event: e, client: l}
+	} else {
+		action = &IssueNoteAction{event: e, client: l}
+	}
+	return l.handleGenericCommentEvent(e, log, action)
 }
 
 func (l *label) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
 	if e == nil {
 		return fmt.Errorf("the event payload is empty")
 	}
-	if *e.Action != "update" {
-		return nil
-	}
-	switch *e.ActionDesc {
-	case "update_label":
+	tp := plugins.ConvertPullRequestAction(e)
+	switch tp {
+	case github.PullRequestActionLabeled:
 		return l.handleCheckLimitLabel(e, log)
-	case "source_branch_changed":
+	case github.PullRequestActionSynchronize:
 		return l.handleClearLabel(e, log)
 	default:
 		return nil
 	}
 }
 
-func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, isPr bool) error {
+func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, action noteEventAction) error {
 	body := *e.Note
 	labelMatches := labelRegex.FindAllStringSubmatch(body, -1)
 	removeLabelMatches := removeLabelRegex.FindAllStringSubmatch(body, -1)
@@ -149,7 +153,7 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, i
 	if err != nil {
 		return err
 	}
-	labels, err := l.getEventObjLabels(e, isPr)
+	labels, err := action.getAllLabels()
 	if err != nil {
 		return err
 	}
@@ -182,7 +186,7 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, i
 			noSuchLabelsInRepo = append(noSuchLabelsInRepo, labelToAdd)
 			continue
 		}
-		if err := l.addLabel(e, isPr, labelToAdd); err != nil {
+		if err := action.addLabel(labelToAdd); err != nil {
 			log.WithError(err).Errorf("Gitee failed to add the following label: %s", labelToAdd)
 		}
 	}
@@ -195,7 +199,7 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, i
 		if !RepoLabelsExisting.Has(labelToRemove) {
 			continue
 		}
-		if err := l.removeLabel(e, isPr, labelToRemove); err != nil {
+		if err := action.removeLabel(labelToRemove); err != nil {
 			log.WithError(err).Errorf("Gitee failed to add the following label: %s", labelToRemove)
 		}
 	}
@@ -204,60 +208,23 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, i
 		msg := fmt.Sprintf("The label(s) `%s` cannot be applied. These labels are supported: `%s`",
 			strings.Join(nonexistent, ", "), strings.Join(additionalLabels, ", "))
 
-		return l.createComment(e, isPr, msg)
+		return action.addComment(msg)
 	}
 	if len(noSuchLabelsInRepo) > 0 {
 		log.Infof("Labels missing in repo: %v", noSuchLabelsInRepo)
 		msg := fmt.Sprintf("The label(s) `%s` cannot be applied, because the repository doesn't have them",
 			strings.Join(noSuchLabelsInRepo, ", "))
 
-		return l.createComment(e, isPr, msg)
+		return action.addComment(msg)
 	}
 	// Tried to remove Labels that were not present on the Issue
 	if len(noSuchLabelsOnIssue) > 0 {
 		msg := fmt.Sprintf("Those labels are not set: `%v`",
 			strings.Join(noSuchLabelsOnIssue, ", "))
 
-		return l.createComment(e, isPr, msg)
+		return action.addComment(msg)
 	}
 	return nil
-}
-
-//getEventObjLabels Get the existing label of the comment object
-func (l *label) getEventObjLabels(e *sdk.NoteEvent, isPr bool) ([]sdk.Label, error) {
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	if isPr {
-		return l.ghc.GetPRLabels(org, repo, int(e.PullRequest.Number))
-	}
-	return l.ghc.GetIssueLabels(org, repo, e.Issue.Number)
-}
-
-func (l *label) addLabel(e *sdk.NoteEvent, isPr bool, label string) error {
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	if isPr {
-		return l.ghc.AddPRLabel(org, repo, int(e.PullRequest.Number), label)
-	}
-	return l.ghc.AddIssueLabel(org, repo, e.Issue.Number, label)
-}
-
-func (l *label) removeLabel(e *sdk.NoteEvent, isPr bool, label string) error {
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	if isPr {
-		return l.ghc.RemovePRLabel(org, repo, int(e.PullRequest.Number), label)
-	}
-	return l.ghc.RemoveIssueLabel(org, repo, e.Issue.Number, label)
-}
-
-func (l *label) createComment(e *sdk.NoteEvent, isPr bool, msg string) error {
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	if isPr {
-		return l.ghc.CreatePRComment(org, repo, int(e.PullRequest.Number), msg)
-	}
-	return l.ghc.CreateGiteeIssueComment(org, repo, e.Issue.Number, msg)
 }
 
 func configString(labels []string) string {

@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"fmt"
 	"strings"
 
 	"gitee.com/openeuler/go-gitee/gitee"
@@ -177,3 +178,26 @@ func HasLabel(label string, labels []gitee.Label) bool {
 	return false
 }
 
+func GetOwnerAndRepoByEvent(e interface{}) (string, string, error) {
+	owner, repo := "", ""
+	switch t := e.(type) {
+	case *gitee.PullRequestEvent:
+		owner = t.Repository.Namespace
+		repo = t.Repository.Path
+	case *gitee.NoteEvent:
+		owner = t.Repository.Namespace
+		repo = t.Repository.Path
+	case *gitee.PushEvent:
+		owner = t.Repository.Namespace
+		repo = t.Repository.Path
+	case *gitee.IssueEvent:
+		owner = t.Repository.Namespace
+		repo = t.Repository.Path
+	default:
+		return "", "", fmt.Errorf("not  support event type")
+	}
+	if owner == "" || repo == "" {
+		return owner, repo, fmt.Errorf("owner or repo is empty")
+	}
+	return owner, repo, nil
+}
