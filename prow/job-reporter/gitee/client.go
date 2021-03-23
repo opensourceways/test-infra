@@ -2,7 +2,7 @@ package gitee
 
 import (
 	"fmt"
-	"github.com/prometheus/common/log"
+	"log"
 	"regexp"
 	"sort"
 	"strconv"
