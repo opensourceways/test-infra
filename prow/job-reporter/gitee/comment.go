@@ -97,10 +97,10 @@ func (j *JobStatusComment) ParseCombinedStatus(botname, sha string, comments []g
 	if oldSha != sha {
 		return []github.Status{}
 	}
-	return j.ParseCommentToStatus(jobsComment)
+	return j.ParseCommentToJobStatus(jobsComment)
 }
 
-func (j *JobStatusComment) ParseCommentToStatus(comment string) []github.Status {
+func (j *JobStatusComment) ParseCommentToJobStatus(comment string) []github.Status {
 	js := strings.Split(comment, "\n")
 	r := make([]github.Status, 0, len(js))
 	for _, s := range js {

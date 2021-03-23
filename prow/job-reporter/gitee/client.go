@@ -1,8 +1,8 @@
 package gitee
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/prometheus/common/log"
 	"regexp"
 	"sort"
 	"strconv"
@@ -20,7 +20,7 @@ var (
 	jobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf("\\| Check Name \\| Result \\| Details \\|\n\\| --- \\| --- \\| --- \\|\n%s\n  <details>Git tree hash: %s</details>", "([\\s\\S]*)", "(.*)"))
 	jobResultNotification    = "| %s %s | %s | [details](%s) |"
 	jobResultEachPartRe      = regexp.MustCompile(fmt.Sprintf("\\| %s %s \\| %s \\| \\[details\\]\\(%s\\) \\|", "(.*)", "(.*)", "(.*)", "(.*)"))
-	jobStatusLabelRe         = regexp.MustCompile(`(?mi)^ci/test-(error|failure|pending|success)\s*$`)
+	jobStatusLabelRe         = regexp.MustCompile(`^ci/test-(error|failure|pending|success)$`)
 )
 
 type giteeClient interface {
@@ -30,7 +30,7 @@ type giteeClient interface {
 	DeletePRComment(org, repo string, ID int) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
 	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
-	UpdatePullRequest(org, repo string, number int32, title, body, state, labels string) (sdk.PullRequest, error)
+	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
 }
 
 var _ report.GitHubClient = (*ghclient)(nil)
@@ -112,10 +112,10 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 	jobsOldComment, oldSha, commentID := jsc.FindCheckResultComment(botname, comments)
 
 	desc := jsc.GenJobResultComment(jobsOldComment, oldSha, ref, s)
-	status := jsc.ParseCommentToStatus(desc)
+	status := jsc.ParseCommentToJobStatus(desc)
 
 	if err := c.updatePRLabel(org, repo, int32(prNumber), pr.Labels, status); err != nil {
-		return err
+		log.Error(err)
 	}
 	// oldSha == "" means there is not status comment exist.
 	if oldSha == "" {
@@ -135,6 +135,11 @@ func (c *ghclient) updatePRLabel(org, repo string, number int32, labels []sdk.La
 	for _, s := range status {
 		statusSet.Insert(s.State)
 	}
+	labelSet.Insert(genLabelByJobStatus(statusSet))
+	return c.ReplacePRAllLabels(org, repo, int(number), labelSet.List())
+}
+
+func genLabelByJobStatus(statusSet sets.String) string {
 	var sLabel string
 	if statusSet.Has(github.StatusError) {
 		sLabel = "ci/test-error"
@@ -145,13 +150,7 @@ func (c *ghclient) updatePRLabel(org, repo string, number int32, labels []sdk.La
 	} else {
 		sLabel = "ci/test-success"
 	}
-	labelSet.Insert(sLabel)
-	lb, err := json.Marshal(labelSet.List())
-	if err != nil {
-		return err
-	}
-	_, err = c.UpdatePullRequest(org, repo, number, "", "", "", string(lb))
-	return err
+	return sLabel
 }
 
 func parsePRNumber(org, repo string, s github.Status) (int, error) {

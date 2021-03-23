@@ -440,6 +440,12 @@ func (c *client) RemoveIssueLabel(org, repo, number, label string) error {
 	return formatErr(err, "rm issue label")
 }
 
+func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []string) error {
+	opt := sdk.PullRequestLabelPostParam{Body: labels}
+	_, _, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberLabels(context.Background(), owner, repo, int32(number), opt)
+	return formatErr(err, "replace pr labels")
+}
+
 func formatErr(err error, doWhat string) error {
 	if err == nil {
 		return err
