@@ -33,7 +33,7 @@ func (cp *checkPr) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp,
 }
 
 func (cp *checkPr) PluginName() string {
-	return "check_pr"
+	return "checkpr"
 }
 
 func (cp *checkPr) NewPluginConfig() plugins.PluginConfig {

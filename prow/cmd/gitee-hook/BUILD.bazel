@@ -66,6 +66,7 @@ go_library(
         "//prow/gitee-plugins/assign:go_default_library",
         "//prow/gitee-plugins/cla:go_default_library",
         "//prow/gitee-plugins/cla-euler:go_default_library",
+        "//prow/gitee-plugins/checkpr:go_default_library",
         "//prow/gitee-plugins/lgtm:go_default_library",
         "//prow/gitee-plugins/slack:go_default_library",
         "//prow/gitee-plugins/trigger:go_default_library",
