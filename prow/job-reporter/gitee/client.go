@@ -2,7 +2,6 @@ package gitee
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"sort"
 	"strconv"
@@ -112,16 +111,16 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 	jobsOldComment, oldSha, commentID := jsc.FindCheckResultComment(botname, comments)
 
 	desc := jsc.GenJobResultComment(jobsOldComment, oldSha, ref, s)
-	status := jsc.ParseCommentToJobStatus(desc)
+	status := jsc.parseCommentToJobStatus(desc)
 
-	if err := c.updatePRLabel(org, repo, int32(prNumber), pr.Labels, status); err != nil {
-		log.Error(err)
-	}
+	uErr := c.updatePRLabel(org, repo, int32(prNumber), pr.Labels, status)
 	// oldSha == "" means there is not status comment exist.
 	if oldSha == "" {
-		return c.CreatePRComment(org, repo, prNumber, desc)
+		err = c.CreatePRComment(org, repo, prNumber, desc)
+		return fmt.Errorf("report job status label or comment error, label error: %v; comment error: %v", uErr, err)
 	}
-	return c.UpdatePRComment(org, repo, commentID, desc)
+	err = c.UpdatePRComment(org, repo, commentID, desc)
+	return fmt.Errorf("report job status label or comment error, label error: %v; comment error: %v", uErr, err)
 }
 
 func (c *ghclient) updatePRLabel(org, repo string, number int32, labels []sdk.Label, status []github.Status) error {
@@ -140,17 +139,16 @@ func (c *ghclient) updatePRLabel(org, repo string, number int32, labels []sdk.La
 }
 
 func genLabelByJobStatus(statusSet sets.String) string {
-	var sLabel string
 	if statusSet.Has(github.StatusError) {
-		sLabel = "ci/test-error"
-	} else if statusSet.Has(github.StatusFailure) {
-		sLabel = "ci/test-failure"
-	} else if statusSet.Has(github.StatusPending) {
-		sLabel = "ci/test-pending"
-	} else {
-		sLabel = "ci/test-success"
+		return "ci/test-error"
 	}
-	return sLabel
+	if statusSet.Has(github.StatusFailure) {
+		return "ci/test-failure"
+	}
+	if statusSet.Has(github.StatusPending) {
+		return "ci/test-pending"
+	}
+	return "ci/test-success"
 }
 
 func parsePRNumber(org, repo string, s github.Status) (int, error) {
