@@ -18,9 +18,10 @@ func (c *ghclient) searchPR(q config.TideQuery, opt gitee.ListPullRequestOpt) ([
 	rprs := []tide.PullRequest{}
 	rprm := map[string]bool{}
 
+	// gitee api will return prs which have one of labels.
 	opt.Labels = q.Labels
 	r := c.getSearchRepos(q)
-	for v, _ := range r {
+	for v := range r {
 		org, repo := splitToOrgRepo(v)
 		if org == "" {
 			continue
@@ -33,10 +34,12 @@ func (c *ghclient) searchPR(q config.TideQuery, opt gitee.ListPullRequestOpt) ([
 
 		for _, pr := range prs {
 			k := prKey(pr)
-			if !rprm[k] && !filterPR(q, pr) {
-				rprm[k] = true
-				rprs = append(rprs, convertToPullRequest(pr))
+
+			if rprm[k] || pr.AssigneesNumber != 0 || pr.TestersNumber != 0 || filterPR(q, pr) {
+				continue
 			}
+			rprm[k] = true
+			rprs = append(rprs, convertToPullRequest(pr))
 		}
 	}
 	return rprs, nil
@@ -131,9 +134,9 @@ func convertToPullRequest(pr sdk.PullRequest) tide.PullRequest {
 		UpdatedAt:   githubql.DateTime{Time: ut},
 	}
 
-	r.Author.Login = githubql.String(pr.Head.User.Login)
+	r.Author.Login = githubql.String(pr.User.Login)
 	r.BaseRef.Name = githubql.String(pr.Base.Ref)
-	r.Repository.Name = githubql.String(pr.Base.Repo.Name)
+	r.Repository.Name = githubql.String(pr.Base.Repo.Path)
 	r.Repository.NameWithOwner = githubql.String(pr.Base.Repo.FullName)
 	r.Repository.Owner.Login = githubql.String(pr.Base.Repo.Namespace.Path)
 

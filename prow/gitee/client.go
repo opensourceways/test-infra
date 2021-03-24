@@ -248,7 +248,7 @@ func (c *client) ListPRComments(org, repo string, number int) ([]sdk.PullRequest
 	return r, nil
 }
 
-func (c *client) ListPrIssues(org, repo string, number int32) ([] sdk.Issue, error) {
+func (c *client) ListPrIssues(org, repo string, number int32) ([]sdk.Issue, error) {
 	var issues []sdk.Issue
 	p := int32(1)
 	opt := sdk.GetV5ReposOwnerRepoPullsNumberIssuesOpts{}
@@ -420,14 +420,16 @@ func (c *client) GetRepos(org string) ([]sdk.Project, error) {
 }
 
 func (c *client) AddIssueLabel(org, repo, number, label string) error {
-	opt := &sdk.PostV5ReposOwnerRepoIssuesNumberLabelsOpts{Body: optional.NewInterface([]string{label})}
-	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(context.Background(), org, repo, number, opt)
+	opt := sdk.PullRequestLabelPostParam{Body: []string{label}}
+	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(
+		context.Background(), org, repo, number, opt)
 	return formatErr(err, "add issue label")
 }
 
 func (c *client) AddMultiIssueLabel(org, repo, number string, label []string) error {
-	opt := &sdk.PostV5ReposOwnerRepoIssuesNumberLabelsOpts{Body: optional.NewInterface(label)}
-	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(context.Background(), org, repo, number, opt)
+	opt := sdk.PullRequestLabelPostParam{Body: label}
+	_, _, err := c.ac.LabelsApi.PostV5ReposOwnerRepoIssuesNumberLabels(
+		context.Background(), org, repo, number, opt)
 	return formatErr(err, "add issue label")
 }
 
