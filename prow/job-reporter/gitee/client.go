@@ -115,17 +115,13 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 
 	uErr := c.updatePRLabel(org, repo, int32(prNumber), pr.Labels, status)
 	// oldSha == "" means there is not status comment exist.
-	tpl := "report job status label or comment error, label error: %v; comment error: %v"
 	if oldSha == "" {
 		err = c.CreatePRComment(org, repo, prNumber, desc)
-		if uErr != nil || err != nil {
-			return fmt.Errorf(tpl, uErr, err)
-		}
-		return nil
+	}else {
+		err = c.UpdatePRComment(org, repo, commentID, desc)
 	}
-	err = c.UpdatePRComment(org, repo, commentID, desc)
 	if uErr != nil || err != nil {
-		return fmt.Errorf(tpl, uErr, err)
+		return fmt.Errorf("report job status label or comment error, label error: %v; comment error: %v", uErr, err)
 	}
 	return nil
 }
