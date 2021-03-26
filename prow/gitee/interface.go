@@ -24,6 +24,7 @@ type Client interface {
 	CreatePRComment(org, repo string, number int, comment string) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
 	AddPRLabel(org, repo string, number int, label string) error
+	AddMultiPRLabel(org, repo string, number int, label []string) error
 	RemovePRLabel(org, repo string, number int, label string) error
 
 	AssignPR(owner, repo string, number int, logins []string) error

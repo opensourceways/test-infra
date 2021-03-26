@@ -6,7 +6,7 @@ import (
 )
 
 type noteEventAction interface {
-	addLabel(label string) error
+	addLabel(label []string) error
 	addComment(comment string) error
 	removeLabel(label string) error
 	getAllLabels() ([]sdk.Label, error)
@@ -17,12 +17,12 @@ type IssueNoteAction struct {
 	client *label
 }
 
-func (ia *IssueNoteAction) addLabel(label string) error {
+func (ia *IssueNoteAction) addLabel(label []string) error {
 	org, repo, err := plugins.GetOwnerAndRepoByEvent(ia.event)
 	if err != nil {
 		return err
 	}
-	return ia.client.ghc.AddIssueLabel(org, repo, ia.event.Issue.Number, label)
+	return ia.client.ghc.AddMultiIssueLabel(org, repo, ia.event.Issue.Number, label)
 }
 
 func (ia *IssueNoteAction) addComment(comment string) error {
@@ -54,12 +54,12 @@ type PRNoteAction struct {
 	client *label
 }
 
-func (pa *PRNoteAction) addLabel(label string) error {
+func (pa *PRNoteAction) addLabel(label []string) error {
 	org, repo, err := plugins.GetOwnerAndRepoByEvent(pa.event)
 	if err != nil {
 		return err
 	}
-	return pa.client.ghc.AddPRLabel(org, repo, int(pa.event.PullRequest.Number), label)
+	return pa.client.ghc.AddMultiPRLabel(org, repo, int(pa.event.PullRequest.Number), label)
 }
 
 func (pa *PRNoteAction) addComment(comment string) error {

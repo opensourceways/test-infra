@@ -31,13 +31,14 @@ type giteeClient interface {
 	AddIssueLabel(org, repo, number, label string) error
 	RemoveIssueLabel(org, repo, number, label string) error
 
-	AddPRLabel(org, repo string, number int, label string) error
+	AddMultiIssueLabel(org, repo, number string, label []string) error
+	AddMultiPRLabel(org, repo string, number int, label []string) error
 	RemovePRLabel(org, repo string, number int, label string) error
 
 	CreatePRComment(org, repo string, number int, comment string) error
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
 
-	UpdatePullRequest(org, repo string, number int32, title, body, state, labels string) (sdk.PullRequest, error)
+	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
 	GetPullRequestOperateLogs(org, repo string, number int32) ([]sdk.OperateLog, error)
 }
 
@@ -53,9 +54,6 @@ func NewLabel(f plugins.GetPluginConfig, gec giteeClient) plugins.Plugin {
 func (l *label) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
 	var labels []string
 	labels = append(labels, defaultLabels...)
-	if cfg, err := l.getLabelCfg(); err == nil {
-		labels = append(labels, cfg.Label.AdditionalLabels...)
-	}
 	pluginHelp := &pluginhelp.PluginHelp{
 		Description: "The label plugin provides commands that add or remove certain types of labels. Labels of the following types can be manipulated: 'kind/*', 'priority/*', 'sig/*'. More labels can be configured to be used via the /label command.",
 		Config: map[string]string{
@@ -95,6 +93,18 @@ func (l *label) getLabelCfg() (*configuration, error) {
 		return nil, fmt.Errorf("can't convert to configuration")
 	}
 	return lCfg, nil
+}
+
+func (l *label) orgRepoCfg(org, repo string) (*labelCfg, error) {
+	cfg, err := l.getLabelCfg()
+	if err != nil {
+		return nil, err
+	}
+	labelCfg := cfg.LabelFor(org, repo)
+	if labelCfg == nil {
+		return nil, fmt.Errorf("no label plugin config for this repo:%s/%s", org, repo)
+	}
+	return labelCfg, nil
 }
 
 func (l *label) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
@@ -168,15 +178,20 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 		labelsToAdd         []string
 		labelsToRemove      []string
 	)
+	org := e.Repository.Namespace
+	repo := e.Repository.Path
 	var additionalLabels []string
-	cfg, err := l.getLabelCfg()
+	cfg, err := l.orgRepoCfg(org, repo)
 	if err == nil {
-		additionalLabels = append(additionalLabels, cfg.Label.AdditionalLabels...)
+		additionalLabels = append(additionalLabels, cfg.AdditionalLabels...)
+	} else {
+		log.Error(err)
 	}
 	// Get labels to add and labels to remove from regexp matches
 	labelsToAdd = append(getLabelsFromREMatches(labelMatches), getLabelsFromGenericMatches(customLabelMatches, additionalLabels, &nonexistent)...)
 	labelsToRemove = append(getLabelsFromREMatches(removeLabelMatches), getLabelsFromGenericMatches(customRemoveLabelMatches, additionalLabels, &nonexistent)...)
 	// Add labels
+	var canAddLabel []string
 	for _, labelToAdd := range labelsToAdd {
 		if plugins.HasLabel(labelToAdd, labels) {
 			continue
@@ -186,9 +201,10 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 			noSuchLabelsInRepo = append(noSuchLabelsInRepo, labelToAdd)
 			continue
 		}
-		if err := action.addLabel(labelToAdd); err != nil {
-			log.WithError(err).Errorf("Gitee failed to add the following label: %s", labelToAdd)
-		}
+		canAddLabel = append(canAddLabel, labelToAdd)
+	}
+	if err := action.addLabel(canAddLabel); err != nil {
+		log.WithError(err).Errorf("Gitee failed to add the following label: %s", strings.Join(canAddLabel, ","))
 	}
 	// Remove labels
 	for _, labelToRemove := range labelsToRemove {

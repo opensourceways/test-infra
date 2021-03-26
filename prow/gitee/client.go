@@ -294,6 +294,13 @@ func (c *client) AddPRLabel(org, repo string, number int, label string) error {
 	return formatErr(err, "add label for pr")
 }
 
+func (c *client) AddMultiPRLabel(org, repo string, number int, label []string) error {
+	opt := sdk.PullRequestLabelPostParam{Body: label}
+	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberLabels(
+		context.Background(), org, repo, int32(number), opt)
+	return formatErr(err, "add multi label for pr")
+}
+
 func (c *client) RemovePRLabel(org, repo string, number int, label string) error {
 	// gitee's bug, it can't deal with the label which includes '/'
 	label = strings.Replace(label, "/", "%2F", -1)
@@ -442,7 +449,8 @@ func (c *client) RemoveIssueLabel(org, repo, number, label string) error {
 
 func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []string) error {
 	opt := sdk.PullRequestLabelPostParam{Body: labels}
-	_, _, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberLabels(context.Background(), owner, repo, int32(number), opt)
+	_, _, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberLabels(
+		context.Background(), owner, repo, int32(number), opt)
 	return formatErr(err, "replace pr labels")
 }
 

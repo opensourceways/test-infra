@@ -2,6 +2,7 @@ package label
 
 import (
 	"fmt"
+	plugins "k8s.io/test-infra/prow/gitee-plugins"
 	"strings"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -10,11 +11,16 @@ import (
 )
 
 func (l *label) handleCheckLimitLabel(e *sdk.PullRequestEvent, log *logrus.Entry) error {
-	cfg, err := l.getLabelCfg()
+	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
 	if err != nil {
 		return err
 	}
-	liLabel := cfg.Label.LimitLabels
+	number := e.PullRequest.Number
+	cfg, err := l.orgRepoCfg(org, repo)
+	if err != nil {
+		return err
+	}
+	liLabel := cfg.LimitLabels
 	if len(liLabel) == 0 {
 		return nil
 	}
@@ -30,11 +36,7 @@ func (l *label) handleCheckLimitLabel(e *sdk.PullRequestEvent, log *logrus.Entry
 		return nil
 	}
 	upLabel := getDifferenceLabels(e.PullRequest.Labels, clLabel)
-	strLabel := strings.Join(upLabel, ",")
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	number := e.PullRequest.Number
-	if _, err := l.ghc.UpdatePullRequest(org, repo, number, "", "", "", strLabel); err != nil {
+	if err := l.ghc.ReplacePRAllLabels(org, repo, int(number), upLabel); err != nil {
 		return err
 	}
 	comment := fmt.Sprintf(
@@ -44,11 +46,16 @@ func (l *label) handleCheckLimitLabel(e *sdk.PullRequestEvent, log *logrus.Entry
 }
 
 func (l *label) handleClearLabel(e *sdk.PullRequestEvent, log *logrus.Entry) error {
-	cfg, err := l.getLabelCfg()
+	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
 	if err != nil {
 		return err
 	}
-	cll := cfg.Label.ClearLabels
+	number := e.PullRequest.Number
+	cfg, err := l.orgRepoCfg(org, repo)
+	if err != nil {
+		return err
+	}
+	cll := cfg.ClearLabels
 	if len(cll) == 0 {
 		log.Debug("No labels to be cleared are configured when PR source branch has changed")
 		return nil
@@ -58,11 +65,8 @@ func (l *label) handleClearLabel(e *sdk.PullRequestEvent, log *logrus.Entry) err
 		return nil
 	}
 	needUpdate := getDifferenceLabels(e.PullRequest.Labels, needClear)
-	strLabel := strings.Join(needUpdate, ",")
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	number := e.PullRequest.Number
-	if _, err := l.ghc.UpdatePullRequest(org, repo, number, "", "", "", strLabel); err != nil {
+
+	if err := l.ghc.ReplacePRAllLabels(org, repo, int(number), needUpdate); err != nil {
 		return err
 	}
 	comment := fmt.Sprintf("This pull request source branch has changed,label(s): **%s** has been removed.",
