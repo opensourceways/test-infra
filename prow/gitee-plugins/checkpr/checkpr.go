@@ -27,7 +27,7 @@ func NewCheckPr(f plugins.GetPluginConfig, gec gitee.Client) plugins.Plugin {
 
 func (cp *checkPr) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
 	pluginHelp := &pluginhelp.PluginHelp{
-		Description: `The checkpr plugin will remove the min num of  reviewers testers designated by the PR author.`,
+		Description: `The checkpr plugin will remove the min num of reviewers and testers designated by the PR author.`,
 	}
 	return pluginHelp, nil
 }
@@ -62,8 +62,8 @@ func (cp *checkPr) removeMinNumReviewerAndTester(e *sdk.PullRequestEvent, log *l
 		return nil
 	}
 
-	assignerNum, testerNum := int32(0), int32(0)
-	param := sdk.PullRequestUpdateParam{AssigneesNumber: &assignerNum, TestersNumber: &testerNum}
+	changeNum := int32(0)
+	param := sdk.PullRequestUpdateParam{AssigneesNumber: &changeNum, TestersNumber: &changeNum}
 	_, err = cp.ghc.UpdatePullRequest(org, repo, number, param)
 	return err
 }

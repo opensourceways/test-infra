@@ -55,5 +55,3 @@ type ListPullRequestOpt struct {
 	MilestoneNumber int
 	Labels          []string
 }
-
-type UpdatePRParam = sdk.PullRequestUpdateParam
