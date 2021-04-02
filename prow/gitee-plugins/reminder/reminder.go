@@ -34,6 +34,13 @@ func (re *reminder) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp
 	pluginHelp := &pluginhelp.PluginHelp{
 		Description: "Labels are essential for issue responding, this tool can remind issue participants to offer the labels",
 	}
+	pluginHelp.AddCommand(pluginhelp.Command{
+		Usage:       "reminder : aoto-trigger ; add labels : // <lable type> / <label subtype>",
+		Description: "remind issue participants to add labels",
+		Featured:    true,
+		WhoCanUse:   "Anyone",
+		Examples:    []string{"//comp/data"},
+	})
 	return pluginHelp, nil
 }
 
@@ -99,12 +106,15 @@ func (re *reminder) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}
 
 	userName := e.Comment.User.Name
-	botName, _ := re.ghc.getBotName()
 	org := e.Repository.Namespace
 	repo := e.Repository.Path
 	issueNumber := e.Issue.Number
 	noteBody := e.Comment.Body
 	noteType := e.NoteableType
+	botName, err := re.ghc.getBotName()
+	if err != nil {
+		return err
+	}
 
 	labelMatches := labelRegex.FindAllStringSubmatch(noteBody, -1)
 	if len(labelMatches) == 0 {
