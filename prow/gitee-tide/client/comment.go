@@ -69,11 +69,8 @@ func (j *jobStatusComment) parseCombinedStatus(botname, sha string, comments []g
 	if oldSha != sha {
 		return []github.Status{}
 	}
-	return j.parseCommentToJobStatus(jobsComment)
-}
 
-func (j *JobStatusComment) parseCommentToJobStatus(comment string) []github.Status {
-	js := strings.Split(comment, "\n")
+	js := strings.Split(jobsComment, "\n")
 	r := make([]github.Status, 0, len(js))
 	for _, s := range js {
 		m := j.JobResultNotificationRe.FindStringSubmatch(s)
