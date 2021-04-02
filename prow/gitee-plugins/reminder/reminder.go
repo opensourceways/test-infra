@@ -13,10 +13,7 @@ import (
 	"k8s.io/test-infra/prow/pluginhelp"
 )
 
-var (
-	defaultLabels = []string{"kind", "priority", "area"}
-	labelRegex    = regexp.MustCompile(`(?m)^//(comp|sig)\s*(.*?)\s*$`)
-)
+var labelRegex = regexp.MustCompile(`(?m)^//(comp|sig)\s*(.*?)\s*$`)
 
 type reminder struct {
 	getPluginConfig plugins.GetPluginConfig
@@ -35,8 +32,8 @@ func (re *reminder) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp
 		Description: "Labels are essential for issue responding, this tool can remind issue participants to offer the labels",
 	}
 	pluginHelp.AddCommand(pluginhelp.Command{
-		Usage:       "reminder : aoto-trigger ; add labels : // <lable type> / <label subtype>",
-		Description: "remind issue participants to add labels",
+		Usage:       "reminder : auto-trigger ; add labels : // <label type> / <label subtype>",
+		Description: "remind issue participants to add labels, the labels available in https://gitee.com/mindspore/community/blob/master/sigs/dx/docs/labels.md",
 		Featured:    true,
 		WhoCanUse:   "Anyone",
 		Examples:    []string{"//comp/data"},
@@ -87,7 +84,7 @@ func (re *reminder) handleIssueEvent(e *sdk.IssueEvent, log *logrus.Entry) error
 	if !hasHELP {
 		if err := re.ghc.CreateComment(org, repo, issueNumber, "Please add labels, for example, "+
 			`if you are filing a runtime issue, you can type "//comp/runtime" in comment,`+
-			` also you can visit "https://shimo.im/sheets/8pKDkqKqdycHRwWV/MODOC/" to find more labels`); err != nil {
+			` also you can visit "https://gitee.com/mindspore/community/blob/master/sigs/dx/docs/labels.md" to find more labels`); err != nil {
 			log.WithError(err).Warningf("Could not add label.")
 		}
 	}
