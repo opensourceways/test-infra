@@ -82,5 +82,5 @@ func newGiteeReporter(o *options, secretAgent *secret.Agent, cfg config.Getter) 
 		return nil, fmt.Errorf("gitee client: %w", err)
 	}
 
-	return gitee.NewReporter(giteeClient, cfg, v1.ProwJobAgent("")), nil
+	return gitee.NewReporter(giteeClient, cfg, v1.ProwJobAgent(""))
 }

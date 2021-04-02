@@ -1,4 +1,4 @@
-package gitee
+package client
 
 import (
 	"fmt"
@@ -6,16 +6,17 @@ import (
 	"strings"
 
 	"k8s.io/test-infra/prow/github"
+	reporter "k8s.io/test-infra/prow/job-reporter/gitee"
 )
 
-type JobStatusComment struct {
+type jobStatusComment struct {
 	JobsResultNotification   string
 	JobsResultNotificationRe *regexp.Regexp
 	JobResultNotification    string
 	JobResultNotificationRe  *regexp.Regexp
 }
 
-func (j *JobStatusComment) FindCheckResultComment(botname string, comments []github.IssueComment) (string, string, int) {
+func (j *jobStatusComment) findCheckResultComment(botname string, comments []github.IssueComment) (string, string, int) {
 	for i := len(comments) - 1; i >= 0; i-- {
 		comment := comments[i]
 		if comment.User.Login != botname {
@@ -31,41 +32,12 @@ func (j *JobStatusComment) FindCheckResultComment(botname string, comments []git
 	return "", "", -1
 }
 
-func (j *JobStatusComment) buildJobResultComment(s github.Status) string {
-	icon := stateToIcon(s.State)
+func (j *jobStatusComment) buildJobResultComment(s github.Status) string {
+	icon := reporter.StateToIcon(s.State)
 	return fmt.Sprintf(j.JobResultNotification, icon, s.Context, s.Description, s.TargetURL)
 }
 
-func stateToIcon(state string) string {
-	icon := ""
-	switch state {
-	case github.StatusPending:
-		icon = ":large_blue_circle:"
-	case github.StatusSuccess:
-		icon = ":white_check_mark:"
-	case github.StatusFailure:
-		icon = ":x:"
-	case github.StatusError:
-		icon = ":heavy_minus_sign:"
-	}
-	return icon
-}
-
-func iconToState(icon string) string {
-	switch icon {
-	case ":large_blue_circle:":
-		return github.StatusPending
-	case ":white_check_mark:":
-		return github.StatusSuccess
-	case ":x:":
-		return github.StatusFailure
-	case ":heavy_minus_sign:":
-		return github.StatusError
-	}
-	return ""
-}
-
-func (j *JobStatusComment) GenJobResultComment(jobsOldComment, oldSha, newSha string, jobStatus github.Status) string {
+func (j *jobStatusComment) genJobResultComment(jobsOldComment, oldSha, newSha string, jobStatus github.Status) string {
 	jobComment := j.buildJobResultComment(jobStatus)
 
 	if oldSha != newSha {
@@ -92,8 +64,8 @@ func (j *JobStatusComment) GenJobResultComment(jobsOldComment, oldSha, newSha st
 	return fmt.Sprintf(j.JobsResultNotification, strings.Join(js, spliter), newSha)
 }
 
-func (j *JobStatusComment) ParseCombinedStatus(botname, sha string, comments []github.IssueComment) []github.Status {
-	jobsComment, oldSha, _ := j.FindCheckResultComment(botname, comments)
+func (j *jobStatusComment) parseCombinedStatus(botname, sha string, comments []github.IssueComment) []github.Status {
+	jobsComment, oldSha, _ := j.findCheckResultComment(botname, comments)
 	if oldSha != sha {
 		return []github.Status{}
 	}
@@ -107,7 +79,7 @@ func (j *JobStatusComment) parseCommentToJobStatus(comment string) []github.Stat
 		m := j.JobResultNotificationRe.FindStringSubmatch(s)
 		if m != nil {
 			r = append(r, github.Status{
-				State:       iconToState(m[1]),
+				State:       reporter.IconToState(m[1]),
 				Context:     m[2],
 				Description: m[3],
 				TargetURL:   m[4],

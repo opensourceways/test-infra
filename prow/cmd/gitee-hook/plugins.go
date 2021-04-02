@@ -7,6 +7,7 @@ import (
 	"k8s.io/test-infra/prow/gitee-plugins/approve"
 	"k8s.io/test-infra/prow/gitee-plugins/assign"
 	"k8s.io/test-infra/prow/gitee-plugins/associate"
+	"k8s.io/test-infra/prow/gitee-plugins/checkpr"
 	"k8s.io/test-infra/prow/gitee-plugins/cla"
 	claeuler "k8s.io/test-infra/prow/gitee-plugins/cla-euler"
 	"k8s.io/test-infra/prow/gitee-plugins/reminder"
@@ -38,6 +39,7 @@ func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.P
 	v = append(v, claeuler.NewCLA(gpc, cs.giteeClient))
 	v = append(v, reminder.NewReminder(gpc, cs.giteeClient))
 	v = append(v, associate.NewAssociate(gpc, cs.giteeClient))
+	v = append(v, checkpr.NewCheckPr(gpc, cs.giteeClient))
 
 	for _, i := range v {
 		name := i.PluginName()

@@ -35,7 +35,7 @@ func (c *ghclient) searchPR(q config.TideQuery, opt gitee.ListPullRequestOpt) ([
 		for _, pr := range prs {
 			k := prKey(pr)
 
-			if rprm[k] || pr.AssigneesNumber != 0 || pr.TestersNumber != 0 || filterPR(q, pr) {
+			if filterPR(q, pr) || !pr.Mergeable || pr.AssigneesNumber != 0 || pr.TestersNumber != 0 || rprm[k] {
 				continue
 			}
 			rprm[k] = true
@@ -79,20 +79,14 @@ func (c *ghclient) getSearchRepos(q config.TideQuery) sets.String {
 }
 
 func filterPR(q config.TideQuery, pr sdk.PullRequest) bool {
-	labels := q.Labels
-	if labels != nil && len(labels) > 0 {
+	if len(q.Labels) > 0 {
 		m := map[string]bool{}
-		for _, l := range labels {
-			m[l] = false
-		}
 		for i := range pr.Labels {
-			le := pr.Labels[i]
-			if _, ok := m[le.Name]; ok {
-				m[le.Name] = true
-			}
+			m[pr.Labels[i].Name] = true
 		}
-		for _, v := range m {
-			if !v {
+
+		for _, l := range q.Labels {
+			if !m[l] {
 				return true
 			}
 		}

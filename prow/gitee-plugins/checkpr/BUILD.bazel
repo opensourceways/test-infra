@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "checkpr.go",
+    ],
+    importpath = "k8s.io/test-infra/prow/gitee-plugins/checkpr",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//prow/config:go_default_library",
+        "//prow/gitee:go_default_library",
+        "//prow/gitee-plugins:go_default_library",
+        "//prow/pluginhelp:go_default_library",
+        "//prow/github:go_default_library",
+        "@com_github_sirupsen_logrus//:go_default_library",
+        "@com_gitee_openeuler_go-gitee//gitee:go_default_library",
+    ],
+)

@@ -1,0 +1,34 @@
+pick 8bdcf76b32 add plugin label-reminder for noticing developer after issue commits
+s 1daed588e4 add comment label enabler
+s dfe6811fd8 fix label addtion
+s 04b199dfa0 recover panic (#36)
+s e19397224e fix gitee-tide, filter prs with more conditions
+s 5443f297a7 Reportstatus (#34)
+s 9432ef0fd4 fix the repo'name when trigger job by ok-to-test
+s a9df2ca818 rename to reminder and fix grammar errors
+s 581a827e1e fix grammar errors
+
+# Rebase 8b263d80c9..581a827e1e onto 8b263d80c9 (9 commands)
+#
+# Commands:
+# p, pick <commit> = use commit
+# r, reword <commit> = use commit, but edit the commit message
+# e, edit <commit> = use commit, but stop for amending
+# s, squash <commit> = use commit, but meld into previous commit
+# f, fixup <commit> = like "squash", but discard this commit's log message
+# x, exec <command> = run command (the rest of the line) using shell
+# b, break = stop here (continue rebase later with 'git rebase --continue')
+# d, drop <commit> = remove commit
+# l, label <label> = label current HEAD with a name
+# t, reset <label> = reset HEAD to a label
+# m, merge [-C <commit> | -c <commit>] <label> [# <oneline>]
+# .       create a merge commit using the original merge commit's
+# .       message (or the oneline, if no original merge commit was
+# .       specified). Use -c <commit> to reword the commit message.
+#
+# These lines can be re-ordered; they are executed from top to bottom.
+#
+# If you remove a line here THAT COMMIT WILL BE LOST.
+#
+# However, if you remove everything, the rebase will be aborted.
+#

@@ -76,13 +76,13 @@ func (c *ghclient) GetCombinedStatus(org, repo, ref string, prNumber int) (*gith
 
 	jobStatus := reporter.ParseCombinedStatus(botname, ref, comments)
 
-	jsc := reporter.JobStatusComment{
+	jsc := jobStatusComment{
 		JobsResultNotification:   jobsResultNotification,
 		JobsResultNotificationRe: jobsResultNotificationRe,
 		JobResultNotification:    jobResultNotification,
 		JobResultNotificationRe:  jobResultNotificationRe,
 	}
-	tideStatus := jsc.ParseCombinedStatus(botname, ref, comments)
+	tideStatus := jsc.parseCombinedStatus(botname, ref, comments)
 	if len(tideStatus) == 1 {
 		jobStatus = append(jobStatus, tideStatus[0])
 	}
@@ -101,7 +101,7 @@ func (c *ghclient) CreateStatus(org, repo, ref string, prNumber int, status gith
 		return err
 	}
 
-	jsc := reporter.JobStatusComment{
+	jsc := jobStatusComment{
 		JobsResultNotification:   jobsResultNotification,
 		JobsResultNotificationRe: jobsResultNotificationRe,
 		JobResultNotification:    jobResultNotification,
@@ -109,9 +109,9 @@ func (c *ghclient) CreateStatus(org, repo, ref string, prNumber int, status gith
 	}
 	// find the old comment even if it is not for the current commit in order to
 	// write the comment at the fixed position.
-	jobsOldComment, oldSha, commentId := jsc.FindCheckResultComment(botname, comments)
+	jobsOldComment, oldSha, commentId := jsc.findCheckResultComment(botname, comments)
 
-	desc := jsc.GenJobResultComment(jobsOldComment, oldSha, ref, status)
+	desc := jsc.genJobResultComment(jobsOldComment, oldSha, ref, status)
 
 	// oldSha == "" means there is not status comment exist.
 	if oldSha == "" {

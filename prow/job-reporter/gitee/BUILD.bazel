@@ -2,7 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["client.go", "reporter.go", "comment.go"],
+    srcs = [
+      "client.go",
+      "reporter.go",
+      "helper.go",
+      "job-comment.go",
+      "jobs-comment.go",
+    ],
     importpath = "k8s.io/test-infra/prow/job-reporter/gitee",
     visibility = ["//visibility:public"],
     deps = [

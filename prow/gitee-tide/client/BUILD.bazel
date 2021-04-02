@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
+        "comment.go",
         "search.go",
     ],
     importpath = "k8s.io/test-infra/prow/gitee-tide/client",

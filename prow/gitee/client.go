@@ -127,14 +127,8 @@ func (c *client) GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]s
 	return r, nil
 }
 
-func (c *client) UpdatePullRequest(org, repo string, number int32, title, body, state, labels string) (sdk.PullRequest, error) {
-	opts := sdk.PullRequestUpdateParam{
-		Title:  title,
-		Body:   body,
-		State:  state,
-		Labels: labels,
-	}
-	pr, _, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsNumber(context.Background(), org, repo, number, opts)
+func (c *client) UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error) {
+	pr, _, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsNumber(context.Background(), org, repo, number, param)
 	return pr, formatErr(err, "update pull request")
 }
 
