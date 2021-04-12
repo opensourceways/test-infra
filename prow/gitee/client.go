@@ -344,6 +344,18 @@ func (c *client) CreateGiteeIssueComment(org, repo string, number string, commen
 	return formatErr(err, "create issue comment")
 }
 
+func (c *client) DeleteGiteeIssueComment(org, repo string, ID int) error {
+	_, err := c.ac.IssuesApi.DeleteV5ReposOwnerRepoIssuesCommentsId(
+		context.Background(), org, repo, int32(ID), nil)
+	return formatErr(err, "delete comment of issue")
+}
+
+func (c *client) UpdateGiteeIssueComment(org, repo string, commentID int, comment string) error {
+	_, _, err := c.ac.IssuesApi.PatchV5ReposOwnerRepoIssuesCommentsId(
+		context.Background(), org, repo, int32(commentID), comment, nil)
+	return formatErr(err, "update comment of issue")
+}
+
 func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
 	v, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaboratorsUsername(
 		context.Background(), owner, repo, login, nil)
