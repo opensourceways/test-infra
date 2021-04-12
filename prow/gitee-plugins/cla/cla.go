@@ -119,7 +119,7 @@ func (cl *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
 			}
 		}
-		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.Head.User.Login))
+		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.User.Login))
 	}
 	if hasCLAYes {
 		if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
@@ -284,9 +284,11 @@ func generateUnSignComment(unSigns []string, commits map[string]*sdk.PullRequest
 	}
 	cs := make([]string, 0, len(unSigns))
 	for _, v := range unSigns {
-		tpl := "The author(**%s**) of commit [%s](%s) need to sign cla."
 		com := commits[v]
-		cs = append(cs, fmt.Sprintf(tpl, com.Commit.Author.Name, com.Sha[:8], com.HtmlUrl))
+		cs = append(cs, fmt.Sprintf(
+			"The author(**%s**) of commit [%s](%s) need to sign cla.",
+			com.Commit.Author.Name, com.Sha[:8], com.HtmlUrl,
+		))
 	}
 	return strings.Join(cs, "\n")
 
@@ -313,6 +315,6 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 }
 
 func alreadySigned(user string) string {
-	s := `***@%s***, thanks for your pull request. You've already signed CLA successfully. :wave: `
+	s := `***@%s***, Thanks for your pull request. All the authors of commits have finished signinig CLA successfully. :wave: `
 	return fmt.Sprintf(s, user)
 }

@@ -119,7 +119,7 @@ func (cl *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
 			}
 		}
-		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.Head.User.Login))
+		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.User.Login))
 	}
 	if hasCLAYes {
 		if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
@@ -218,19 +218,18 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 		if v.Commit == nil {
 			continue
 		}
-		committer := v.Commit.Committer
-		author := v.Commit.Author
-		if committer == nil || author == nil {
-			return "", false, fmt.Errorf("the commit %s not have commiter or author", v.Sha)
+
+		if v.Commit.Committer == nil || v.Commit.Author == nil {
+			return "", false, fmt.Errorf("the commit %s not have commiter or author", headOfSHA(v.Sha))
 		}
-		email := committer.Email
-		if email == "noreply@gitee.com" || committer.Name == "Gitee" {
-			email = v.Commit.Author.Email
-		}
+
+		email := getAuthorOfCommit(v.Commit).Email
 		if email == "" {
 			comment := fmt.Sprintf(
-				"The email address of author or commiter for commit [%s](%s) is empty. ", v.Sha[:8], v.HtmlUrl)
-			 _ = cl.ghc.CreateComment(org, repo, number, comment)
+				"The email address of author or commiter for commit [%s](%s) is empty.",
+				headOfSHA(v.Sha), v.HtmlUrl,
+			)
+			_ = cl.ghc.CreateComment(org, repo, number, comment)
 			return "", false, fmt.Errorf(comment)
 		}
 		if _, ok := cos[email]; !ok {
@@ -243,6 +242,17 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 	}
 	comment := generateUnSignComment(unSigns, cos)
 	return comment, signed, err
+}
+
+func headOfSHA(sha string) string {
+	return sha[:8]
+}
+
+func getAuthorOfCommit(c *sdk.GitCommit) *sdk.GitUser {
+	if c.Committer.Email == "noreply@gitee.com" || c.Committer.Name == "Gitee" {
+		return c.Author
+	}
+	return c.Committer
 }
 
 func checkCommitsSigned(commits map[string]*sdk.PullRequestCommits, checkURL string) ([]string, bool, error) {
@@ -294,13 +304,18 @@ func isSigned(email, url string) (bool, error) {
 
 func generateUnSignComment(unSigns []string, commits map[string]*sdk.PullRequestCommits) string {
 	if len(unSigns) == 1 {
-		return fmt.Sprintf("The author(**%s**) need to sign cla.", commits[unSigns[0]].Commit.Author.Name)
+		return fmt.Sprintf(
+			"The author(**%s**) need to sign cla.",
+			getAuthorOfCommit(commits[unSigns[0]].Commit).Name,
+		)
 	}
 	cs := make([]string, 0, len(unSigns))
 	for _, v := range unSigns {
-		tpl := "The author(**%s**) of commit [%s](%s) need to sign cla."
 		com := commits[v]
-		cs = append(cs, fmt.Sprintf(tpl, com.Commit.Author.Name, com.Sha[:8], com.HtmlUrl))
+		cs = append(cs, fmt.Sprintf(
+			"The author(**%s**) of commit [%s](%s) need to sign cla.",
+			getAuthorOfCommit(com.Commit).Name, headOfSHA(com.Sha), com.HtmlUrl,
+		))
 	}
 	return strings.Join(cs, "\n")
 
@@ -326,6 +341,6 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 }
 
 func alreadySigned(user string) string {
-	s := `***@%s***, thanks for your pull request. You've already signed CLA successfully. :wave: `
+	s := `***@%s***, Thanks for your pull request. All the authors of commits have finished signinig CLA successfully. :wave: `
 	return fmt.Sprintf(s, user)
 }
