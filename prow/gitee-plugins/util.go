@@ -54,7 +54,7 @@ func setPullRequestInfo(e *gitee.NoteEvent, gc *github.GenericCommentEvent) {
 	pr := e.PullRequest
 	gc.IsPR = true
 	gc.IssueState = pr.State
-	gc.IssueAuthor.Login = pr.Head.User.Login
+	gc.IssueAuthor.Login = pr.User.Login
 	gc.Number = int(pr.Number)
 	gc.IssueBody = pr.Body
 	gc.IssueHTMLURL = pr.HtmlUrl
@@ -83,8 +83,8 @@ func ConvertPullRequestEvent(e *gitee.PullRequestEvent) github.PullRequestEvent 
 				SHA: epr.Head.Sha,
 			},
 			User: github.User{
-				Login:   epr.Head.User.Login,
-				HTMLURL: epr.Head.User.HtmlUrl,
+				Login:   epr.User.Login,
+				HTMLURL: epr.User.HtmlUrl,
 			},
 			Number:   int(epr.Number),
 			HTMLURL:  epr.HtmlUrl,

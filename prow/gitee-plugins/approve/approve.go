@@ -141,7 +141,7 @@ func (a *approve) handle(org, repo string, pr *sdk.PullRequestHook, log *logrus.
 		repoc,
 		getGiteeOption(),
 		c,
-		origina.NewState(org, repo, pr.Base.Ref, pr.Body, pr.Head.User.Login, pr.HtmlUrl, int(pr.Number), assignees),
+		origina.NewState(org, repo, pr.Base.Ref, pr.Body, pr.User.Login, pr.HtmlUrl, int(pr.Number), assignees),
 	)
 }
 

@@ -252,7 +252,7 @@ func (d *dispatcher) handlePullRequestEvent(pr *gitee.PullRequestEvent, l *logru
 		github.OrgLogField:  pr.Repository.Namespace,
 		github.RepoLogField: pr.Repository.Path,
 		github.PrLogField:   pr.PullRequest.Number,
-		"author":            pr.PullRequest.Head.User.Login,
+		"author":            pr.PullRequest.User.Login,
 		"url":               pr.PullRequest.HtmlUrl,
 	})
 	l.Infof("Pull request %s.", *pr.Action)
