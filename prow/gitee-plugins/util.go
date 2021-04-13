@@ -194,7 +194,7 @@ func GetOwnerAndRepoByEvent(e interface{}) (string, string, error) {
 		owner = t.Repository.Namespace
 		repo = t.Repository.Path
 	default:
-		return "", "", fmt.Errorf("not  support event type")
+		return "", "", fmt.Errorf("not support event type")
 	}
 	if owner == "" || repo == "" {
 		return owner, repo, fmt.Errorf("owner or repo is empty")

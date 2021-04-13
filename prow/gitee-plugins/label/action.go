@@ -14,7 +14,7 @@ type noteEventAction interface {
 
 type IssueNoteAction struct {
 	event  *sdk.NoteEvent
-	client *label
+	client giteeClient
 }
 
 func (ia *IssueNoteAction) addLabel(label []string) error {
@@ -22,7 +22,7 @@ func (ia *IssueNoteAction) addLabel(label []string) error {
 	if err != nil {
 		return err
 	}
-	return ia.client.ghc.AddMultiIssueLabel(org, repo, ia.event.Issue.Number, label)
+	return ia.client.AddMultiIssueLabel(org, repo, ia.issueNumber(), label)
 }
 
 func (ia *IssueNoteAction) addComment(comment string) error {
@@ -30,7 +30,7 @@ func (ia *IssueNoteAction) addComment(comment string) error {
 	if err != nil {
 		return err
 	}
-	return ia.client.ghc.CreateGiteeIssueComment(org, repo, ia.event.Issue.Number, comment)
+	return ia.client.CreateGiteeIssueComment(org, repo, ia.issueNumber(), comment)
 }
 
 func (ia *IssueNoteAction) removeLabel(label string) error {
@@ -38,7 +38,7 @@ func (ia *IssueNoteAction) removeLabel(label string) error {
 	if err != nil {
 		return err
 	}
-	return ia.client.ghc.RemoveIssueLabel(org, repo, ia.event.Issue.Number, label)
+	return ia.client.RemoveIssueLabel(org, repo, ia.issueNumber(), label)
 }
 
 func (ia *IssueNoteAction) getAllLabels() ([]sdk.Label, error) {
@@ -46,12 +46,20 @@ func (ia *IssueNoteAction) getAllLabels() ([]sdk.Label, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ia.client.ghc.GetIssueLabels(org, repo, ia.event.Issue.Number)
+	return ia.client.GetIssueLabels(org, repo, ia.issueNumber())
+}
+
+func (ia *IssueNoteAction) issueNumber() string {
+	return ia.event.Issue.Number
 }
 
 type PRNoteAction struct {
 	event  *sdk.NoteEvent
-	client *label
+	client giteeClient
+}
+
+func (pa *PRNoteAction) prNumber() int {
+	return int(pa.event.PullRequest.Number)
 }
 
 func (pa *PRNoteAction) addLabel(label []string) error {
@@ -59,7 +67,7 @@ func (pa *PRNoteAction) addLabel(label []string) error {
 	if err != nil {
 		return err
 	}
-	return pa.client.ghc.AddMultiPRLabel(org, repo, int(pa.event.PullRequest.Number), label)
+	return pa.client.AddMultiPRLabel(org, repo, pa.prNumber(), label)
 }
 
 func (pa *PRNoteAction) addComment(comment string) error {
@@ -67,7 +75,7 @@ func (pa *PRNoteAction) addComment(comment string) error {
 	if err != nil {
 		return err
 	}
-	return pa.client.ghc.CreatePRComment(org, repo, int(pa.event.PullRequest.Number), comment)
+	return pa.client.CreatePRComment(org, repo, pa.prNumber(), comment)
 }
 
 func (pa *PRNoteAction) removeLabel(label string) error {
@@ -75,7 +83,7 @@ func (pa *PRNoteAction) removeLabel(label string) error {
 	if err != nil {
 		return err
 	}
-	return pa.client.ghc.RemovePRLabel(org, repo, int(pa.event.PullRequest.Number), label)
+	return pa.client.RemovePRLabel(org, repo, pa.prNumber(), label)
 }
 
 func (pa *PRNoteAction) getAllLabels() ([]sdk.Label, error) {
@@ -83,5 +91,5 @@ func (pa *PRNoteAction) getAllLabels() ([]sdk.Label, error) {
 	if err != nil {
 		return nil, err
 	}
-	return pa.client.ghc.GetPRLabels(org, repo, int(pa.event.PullRequest.Number))
+	return pa.client.GetPRLabels(org, repo, pa.prNumber())
 }

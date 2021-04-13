@@ -2,13 +2,13 @@ package label
 
 import (
 	"fmt"
-	"k8s.io/test-infra/prow/github"
 	"regexp"
 	"strings"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/test-infra/prow/github"
 
 	prowConfig "k8s.io/test-infra/prow/config"
 	plugins "k8s.io/test-infra/prow/gitee-plugins"
@@ -38,7 +38,6 @@ type giteeClient interface {
 	CreatePRComment(org, repo string, number int, comment string) error
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
 
-	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
 	GetPullRequestOperateLogs(org, repo string, number int32) ([]sdk.OperateLog, error)
 }
 
@@ -127,9 +126,9 @@ func (l *label) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}
 	var action noteEventAction
 	if isPr {
-		action = &PRNoteAction{event: e, client: l}
+		action = &PRNoteAction{event: e, client: l.ghc}
 	} else {
-		action = &IssueNoteAction{event: e, client: l}
+		action = &IssueNoteAction{event: e, client: l.ghc}
 	}
 	return l.handleGenericCommentEvent(e, log, action)
 }
@@ -178,11 +177,12 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 		labelsToAdd         []string
 		labelsToRemove      []string
 	)
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
+	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
+	if err != nil {
+		return err
+	}
 	var additionalLabels []string
-	cfg, err := l.orgRepoCfg(org, repo)
-	if err == nil {
+	if cfg, err := l.orgRepoCfg(org, repo); err == nil {
 		additionalLabels = append(additionalLabels, cfg.AdditionalLabels...)
 	} else {
 		log.Error(err)

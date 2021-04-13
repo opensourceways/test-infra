@@ -24,7 +24,12 @@ func (l *label) handleCheckLimitLabel(e *sdk.PullRequestEvent, log *logrus.Entry
 	if len(liLabel) == 0 {
 		return nil
 	}
-	needCheck := getIntersectionLabels(e.PullRequest.Labels, liLabel)
+	prLabels, err := l.ghc.GetPRLabels(org, repo, int(number))
+	if err != nil {
+		return err
+	}
+	log.Info(prLabels)
+	needCheck := getIntersectionOfLabels(e.PullRequest.Labels, liLabel)
 	if len(needCheck) == 0 {
 		return nil
 	}
@@ -35,10 +40,11 @@ func (l *label) handleCheckLimitLabel(e *sdk.PullRequestEvent, log *logrus.Entry
 	if len(clLabel) == 0 {
 		return nil
 	}
-	upLabel := getDifferenceLabels(e.PullRequest.Labels, clLabel)
-	if err := l.ghc.ReplacePRAllLabels(org, repo, int(number), upLabel); err != nil {
+
+	if err = l.removeLabels(org, repo, int(number), clLabel, log); err != nil {
 		return err
 	}
+
 	comment := fmt.Sprintf(
 		"These label(s): **%s** cannot be added by the author of the Pull request, so they have been removed.",
 		strings.Join(clLabel, ","))
@@ -60,15 +66,14 @@ func (l *label) handleClearLabel(e *sdk.PullRequestEvent, log *logrus.Entry) err
 		log.Debug("No labels to be cleared are configured when PR source branch has changed")
 		return nil
 	}
-	needClear := getIntersectionLabels(e.PullRequest.Labels, cll)
+	needClear := getIntersectionOfLabels(e.PullRequest.Labels, cll)
 	if len(needClear) == 0 {
 		return nil
 	}
-	needUpdate := getDifferenceLabels(e.PullRequest.Labels, needClear)
-
-	if err := l.ghc.ReplacePRAllLabels(org, repo, int(number), needUpdate); err != nil {
+	if err = l.removeLabels(org, repo, int(number), needClear, log); err != nil {
 		return err
 	}
+
 	comment := fmt.Sprintf("This pull request source branch has changed,label(s): **%s** has been removed.",
 		strings.Join(needClear, ","))
 	return l.ghc.CreatePRComment(org, repo, int(number), comment)
@@ -97,20 +102,25 @@ func (l *label) getAuthorAddLabels(e *sdk.PullRequestEvent, checkLabels []string
 	return clearLabels, nil
 }
 
-func getIntersectionLabels(labels []sdk.LabelHook, labels2 []string) []string {
+func (l *label) removeLabels(org, repo string, number int, rms []string, log *logrus.Entry) error {
+	ar := make([]string, 0, len(rms))
+	for _, v := range rms {
+		if err := l.ghc.RemovePRLabel(org, repo, number, v); err != nil {
+			log.Error(err)
+			ar = append(ar, v)
+		}
+	}
+	if len(ar) != 0 {
+		return fmt.Errorf("remove %s label(s) occur error", strings.Join(ar, ","))
+	}
+	return nil
+}
+
+func getIntersectionOfLabels(labels []sdk.LabelHook, labels2 []string) []string {
 	s1 := sets.String{}
 	for _, l := range labels {
 		s1.Insert(l.Name)
 	}
 	s2 := sets.NewString(labels2...)
 	return s1.Intersection(s2).List()
-}
-
-func getDifferenceLabels(labels []sdk.LabelHook, cLabels []string) []string {
-	s1 := sets.String{}
-	for _, l := range labels {
-		s1.Insert(l.Name)
-	}
-	s2 := sets.NewString(cLabels...)
-	return s1.Difference(s2).List()
 }
