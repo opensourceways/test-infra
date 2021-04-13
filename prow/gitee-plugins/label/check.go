@@ -24,11 +24,6 @@ func (l *label) handleCheckLimitLabel(e *sdk.PullRequestEvent, log *logrus.Entry
 	if len(liLabel) == 0 {
 		return nil
 	}
-	prLabels, err := l.ghc.GetPRLabels(org, repo, int(number))
-	if err != nil {
-		return err
-	}
-	log.Info(prLabels)
 	needCheck := getIntersectionOfLabels(e.PullRequest.Labels, liLabel)
 	if len(needCheck) == 0 {
 		return nil
@@ -106,7 +101,6 @@ func (l *label) removeLabels(org, repo string, number int, rms []string, log *lo
 	ar := make([]string, 0, len(rms))
 	for _, v := range rms {
 		if err := l.ghc.RemovePRLabel(org, repo, number, v); err != nil {
-			log.Error(err)
 			ar = append(ar, v)
 		}
 	}
