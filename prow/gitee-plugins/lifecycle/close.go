@@ -79,7 +79,6 @@ func closePullRequest(gc closeClient, log *logrus.Entry, e *sdk.NoteEvent) error
 	}
 
 	number := int(e.PullRequest.Number)
-
 	// Only authors and collaborators are allowed to close  PR.
 	if !isAuthor && !isCollaborator {
 		response := "You can't close an  PullRequest unless you authored it or you are a collaborator."

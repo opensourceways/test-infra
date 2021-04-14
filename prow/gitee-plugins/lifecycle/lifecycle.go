@@ -65,7 +65,7 @@ func (l *lifecycle) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}()
 
 	eType := *(e.NoteableType)
-	if *(e.Action) != "comment" || (eType != "PullRequest" && eType != "Issue") {
+	if *(e.Action) != "comment" || (!isPr(eType) && eType != "Issue") {
 		log.Debug("Event is not a creation of a comment for PR or issue, skipping.")
 		return nil
 	}

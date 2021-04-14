@@ -37,7 +37,6 @@ func handleReopen(gc reopenClient, log *logrus.Entry, e *sdk.NoteEvent) error {
 	}
 
 	number := e.Issue.Number
-
 	// Only authors and collaborators are allowed to reopen issues or PRs.
 	if !isAuthor && !isCollaborator {
 		response := "You can't reopen an issue/PR unless you authored it or you are a collaborator."
