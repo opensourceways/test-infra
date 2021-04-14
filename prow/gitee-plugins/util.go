@@ -179,7 +179,6 @@ func HasLabel(label string, labels []gitee.Label) bool {
 }
 
 func GetOwnerAndRepoByEvent(e interface{}) (string, string, error) {
-	owner, repo := "", ""
 	var repository *gitee.ProjectHook
 	switch t := e.(type) {
 	case *gitee.PullRequestEvent:
@@ -193,11 +192,15 @@ func GetOwnerAndRepoByEvent(e interface{}) (string, string, error) {
 	default:
 		return "", "", fmt.Errorf("not support event type")
 	}
-	if repository != nil {
-		owner,repo = repository.Namespace,repository.Path
+
+	if repository == nil {
+		return "", "", fmt.Errorf("no repository")
 	}
-	if owner == "" || repo == "" {
-		return owner, repo, fmt.Errorf("owner or repo is empty")
+	org := repository.Namespace
+	repo := repository.Path
+
+	if org == "" || repo == "" {
+		return "", "", fmt.Errorf("owner or repo is empty")
 	}
-	return owner, repo, nil
+	return org, repo, nil
 }

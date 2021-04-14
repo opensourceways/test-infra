@@ -15,7 +15,6 @@ func (l *label) handleClearLabel(e *sdk.PullRequestEvent, log *logrus.Entry) err
 	if err != nil {
 		return err
 	}
-	number := e.PullRequest.Number
 	cfg, err := l.orgRepoCfg(org, repo)
 	if err != nil {
 		return err
@@ -29,12 +28,14 @@ func (l *label) handleClearLabel(e *sdk.PullRequestEvent, log *logrus.Entry) err
 	if len(needClear) == 0 {
 		return nil
 	}
+
+	number := e.PullRequest.Number
 	if err = l.removeLabels(org, repo, int(number), needClear, log); err != nil {
 		return err
 	}
 
-	comment := fmt.Sprintf("This pull request source branch has changed,label(s): **%s** has been removed.",
-		strings.Join(needClear, ","))
+	comment := fmt.Sprintf(
+		"This pull request source branch has changed,label(s): **%s** has been removed.", strings.Join(needClear, ","))
 	return l.ghc.CreatePRComment(org, repo, int(number), comment)
 }
 

@@ -7,7 +7,6 @@ import (
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/test-infra/prow/github"
 
 	prowConfig "k8s.io/test-infra/prow/config"
@@ -141,7 +140,7 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 		return nil
 	}
 
-	org,repo,err := plugins.GetOwnerAndRepoByEvent(e)
+	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
 	if err != nil {
 		return err
 	}
@@ -153,86 +152,70 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 	if err != nil {
 		return err
 	}
-	repoLabelsExisting := sets.String{}
-	for _, l := range repoLabels {
-		repoLabelsExisting.Insert(l.Name)
-	}
-	issueLabels := sets.String{}
-	for _, l := range labels {
-		issueLabels.Insert(l.Name)
-	}
+
+	repoLabelsExisting := labelsTransformMap(repoLabels)
+
+	issueLabels := labelsTransformMap(labels)
 
 	//add labels
 	noSuchLabelsInRepo := addMatchLabels(labelMatches, issueLabels, repoLabelsExisting, action, log)
 	//remove labels
-	noSuchLabelsOnIssue := removeMatchLabels(removeLabelMatches, issueLabels, repoLabelsExisting, action, log)
+	removeMatchLabels(removeLabelMatches, issueLabels, action, log)
 
-	return doMatchLabelsResult(action,noSuchLabelsOnIssue,noSuchLabelsInRepo,log)
-
-}
-
-func doMatchLabelsResult(action noteEventAction, noSuchIssueLabels, noSuchRepoLabels []string,log *logrus.Entry) error {
-	// Tried to add Labels that were not present on the repo
-	if len(noSuchRepoLabels) > 0 {
-		log.Infof("Labels missing in repo: %v", noSuchRepoLabels)
+	if len(noSuchLabelsInRepo) > 0 {
+		log.Infof("Labels missing in repo: %v", noSuchLabelsInRepo)
 		msg := fmt.Sprintf("The label(s) `%s` cannot be applied, because the repository doesn't have them",
-			strings.Join(noSuchRepoLabels, ", "))
-
-		return action.addComment(msg)
-	}
-	// Tried to remove Labels that were not present on the Issue
-	if len(noSuchIssueLabels) > 0 {
-		msg := fmt.Sprintf("Those labels are not set: `%v`",
-			strings.Join(noSuchIssueLabels, ", "))
+			strings.Join(noSuchLabelsInRepo, ", "))
 
 		return action.addComment(msg)
 	}
 	return nil
 }
 
-func removeMatchLabels(match [][]string, labels, repoLabels sets.String, action noteEventAction, log *logrus.Entry) []string {
-	var noSuchLabelsOnIssue []string
+func removeMatchLabels(match [][]string, labels map[string]string, action noteEventAction, log *logrus.Entry) {
 	if len(match) == 0 {
-		return noSuchLabelsOnIssue
+		return
 	}
 	labelsToRemove := getLabelsFromREMatches(match)
 
 	// Remove labels
 	for _, labelToRemove := range labelsToRemove {
-		if !labels.Has(labelToRemove) {
-			noSuchLabelsOnIssue = append(noSuchLabelsOnIssue, labelToRemove)
+		label, ok := labels[labelToRemove]
+		if !ok {
 			continue
 		}
-		if !repoLabels.Has(labelToRemove) {
-			continue
-		}
-		if err := action.removeLabel(labelToRemove); err != nil {
-			log.WithError(err).Errorf("Gitee failed to add the following label: %s", labelToRemove)
+
+		if err := action.removeLabel(label); err != nil {
+			log.WithError(err).Errorf("Gitee failed to add the following label: %s", label)
 		}
 	}
-	return noSuchLabelsOnIssue
 }
 
-func addMatchLabels(matches [][]string, labels, repoLabels sets.String, action noteEventAction, log *logrus.Entry) []string {
-	var noSuchLabelsInRepo []string
+func addMatchLabels(matches [][]string, labels, repoLabels map[string]string, action noteEventAction, log *logrus.Entry) []string {
 	if len(matches) == 0 {
-		return noSuchLabelsInRepo
+		return nil
 	}
 
 	labelsToAdd := getLabelsFromREMatches(matches)
 
+	var noSuchLabelsInRepo []string
 	// Add labels
 	var canAddLabel []string
 	for _, labelToAdd := range labelsToAdd {
-		if labels.Has(labelToAdd) {
+		if _, ok := labels[labelToAdd]; ok {
 			continue
 		}
 
-		if !repoLabels.Has(labelToAdd) {
+		label, ok := repoLabels[labelToAdd]
+		if !ok {
 			noSuchLabelsInRepo = append(noSuchLabelsInRepo, labelToAdd)
 			continue
 		}
-		canAddLabel = append(canAddLabel, labelToAdd)
+		canAddLabel = append(canAddLabel, label)
+	}
+
+	if len(canAddLabel) == 0 {
+		return noSuchLabelsInRepo
 	}
 	if err := action.addLabel(canAddLabel); err != nil {
 		log.WithError(err).Errorf("Gitee failed to add the following label: %s", strings.Join(canAddLabel, ","))
@@ -256,9 +239,18 @@ func configString(labels []string) string {
 func getLabelsFromREMatches(matches [][]string) (labels []string) {
 	for _, match := range matches {
 		for _, label := range strings.Split(match[0], " ")[1:] {
-			label = match[1] + "/" + strings.TrimSpace(label)
+			label = strings.ToLower(match[1] + "/" + strings.TrimSpace(label))
 			labels = append(labels, label)
 		}
 	}
 	return
+}
+
+func labelsTransformMap(labels []sdk.Label) map[string]string {
+	lm := make(map[string]string, len(labels))
+	for _, v := range labels {
+		k := strings.ToLower(v.Name)
+		lm[k] = v.Name
+	}
+	return lm
 }
