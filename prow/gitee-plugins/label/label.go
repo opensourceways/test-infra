@@ -37,8 +37,6 @@ type giteeClient interface {
 
 	CreatePRComment(org, repo string, number int, comment string) error
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
-
-	GetPullRequestOperateLogs(org, repo string, number int32) ([]sdk.OperateLog, error)
 }
 
 type label struct {
@@ -138,14 +136,11 @@ func (l *label) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entr
 		return fmt.Errorf("the event payload is empty")
 	}
 	tp := plugins.ConvertPullRequestAction(e)
-	switch tp {
-	case github.PullRequestActionLabeled:
-		return l.handleCheckLimitLabel(e, log)
-	case github.PullRequestActionSynchronize:
+	if tp == github.PullRequestActionSynchronize {
 		return l.handleClearLabel(e, log)
-	default:
-		return nil
 	}
+
+	return nil
 }
 
 func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, action noteEventAction) error {
