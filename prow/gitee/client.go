@@ -127,12 +127,6 @@ func (c *client) GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]s
 	return r, nil
 }
 
-func (c *client) GetPullRequestOperateLogs(org, repo string, number int32) ([]sdk.OperateLog, error) {
-	logs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberOperateLogs(
-		context.Background(), org, repo, number, nil)
-	return logs, formatErr(err, "get PR operated log")
-}
-
 func (c *client) UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error) {
 	pr, _, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsNumber(context.Background(), org, repo, number, param)
 	return pr, formatErr(err, "update pull request")
@@ -447,13 +441,6 @@ func (c *client) RemoveIssueLabel(org, repo, number, label string) error {
 	return formatErr(err, "rm issue label")
 }
 
-func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []string) error {
-	opt := sdk.PullRequestLabelPostParam{Body: labels}
-	_, _, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberLabels(
-		context.Background(), owner, repo, int32(number), opt)
-	return formatErr(err, "replace pr labels")
-}
-
 func (c *client) GetIssueLabels(org, repo, number string) ([]sdk.Label, error) {
 	labels, _, err := c.ac.LabelsApi.GetV5ReposOwnerRepoIssuesNumberLabels(
 		context.Background(), org, repo, number, nil)
@@ -463,6 +450,13 @@ func (c *client) GetIssueLabels(org, repo, number string) ([]sdk.Label, error) {
 func (c *client) GetRepoLabels(owner, repo string) ([]sdk.Label, error) {
 	labels, _, err := c.ac.LabelsApi.GetV5ReposOwnerRepoLabels(context.Background(), owner, repo, nil)
 	return labels, formatErr(err, "get repo labels")
+}
+
+func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []string) error {
+	opt := sdk.PullRequestLabelPostParam{Body: labels}
+	_, _, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberLabels(
+		context.Background(), owner, repo, int32(number), opt)
+	return formatErr(err, "replace pr labels")
 }
 
 func formatErr(err error, doWhat string) error {

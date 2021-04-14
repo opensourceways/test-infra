@@ -12,7 +12,6 @@ type Client interface {
 	CreatePullRequest(org, repo, title, body, head, base string, canModify bool) (sdk.PullRequest, error)
 	GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]sdk.PullRequest, error)
 	UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error)
-	GetPullRequestOperateLogs(org, repo string, number int32) ([]sdk.OperateLog, error)
 
 	ListCollaborators(org, repo string) ([]github.User, error)
 	GetRef(org, repo, ref string) (string, error)
@@ -43,13 +42,14 @@ type Client interface {
 	MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error
 
 	GetRepos(org string) ([]sdk.Project, error)
+	GetRepoLabels(owner, repo string) ([]sdk.Label, error)
+
 	AddIssueLabel(org, repo, number, label string) error
 	AddMultiIssueLabel(org, repo, number string, label []string) error
-
-	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
 	RemoveIssueLabel(org, repo, number, label string) error
 	GetIssueLabels(org, repo, number string) ([]sdk.Label, error)
-	GetRepoLabels(owner, repo string) ([]sdk.Label, error)
+
+	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
 }
 
 type ListPullRequestOpt struct {

@@ -9,9 +9,6 @@ import (
 type labelCfg struct {
 	// Repos is either of the form org/repos or just org.
 	Repos []string `json:"repos" required:"true"`
-	// AdditionalLabels is a set of additional labels enabled for use
-	// on top of the existing "kind/*", "priority/*", and "sig/*" labels.
-	AdditionalLabels []string `json:"additional_labels"`
 	//ClearLabels specifies labels that should be removed when the codes of PR are changed.
 	ClearLabels []string `json:"clear_labels"`
 }

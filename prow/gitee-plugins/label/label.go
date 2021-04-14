@@ -16,11 +16,9 @@ import (
 )
 
 var (
-	defaultLabels          = []string{"kind", "priority", "sig"}
-	labelRegex             = regexp.MustCompile(`(?m)^/(kind|priority|sig)\s*(.*?)\s*$`)
-	removeLabelRegex       = regexp.MustCompile(`(?m)^/remove-(kind|priority|sig)\s*(.*?)\s*$`)
-	customLabelRegex       = regexp.MustCompile(`(?m)^/label\s*(.*?)\s*$`)
-	customRemoveLabelRegex = regexp.MustCompile(`(?m)^/remove-label\s*(.*?)\s*$`)
+	defaultLabels    = []string{"kind", "priority", "sig"}
+	labelRegex       = regexp.MustCompile(`(?m)^/(kind|priority|sig)\s*(.*?)\s*$`)
+	removeLabelRegex = regexp.MustCompile(`(?m)^/remove-(kind|priority|sig)\s*(.*?)\s*$`)
 )
 
 type giteeClient interface {
@@ -52,7 +50,7 @@ func (l *label) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, er
 	var labels []string
 	labels = append(labels, defaultLabels...)
 	pluginHelp := &pluginhelp.PluginHelp{
-		Description: "The label plugin provides commands that add or remove certain types of labels. Labels of the following types can be manipulated: 'kind/*', 'priority/*', 'sig/*'. More labels can be configured to be used via the /label command.",
+		Description: "The label plugin provides commands that add or remove certain types of labels. Labels of the following types can be manipulated: 'kind/*', 'priority/*', 'sig/*'.",
 		Config: map[string]string{
 			"": configString(labels),
 		},
@@ -62,7 +60,7 @@ func (l *label) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, er
 		Description: "Applies or removes a label from one of the recognized types of labels.",
 		Featured:    false,
 		WhoCanUse:   "Anyone can trigger this command on a PR.",
-		Examples:    []string{"/kind bug", "/sig testing", "/label foo-bar-baz"},
+		Examples:    []string{"/kind bug", "/sig testing", "/priority high"},
 	})
 	return pluginHelp, nil
 }
@@ -105,29 +103,21 @@ func (l *label) orgRepoCfg(org, repo string) (*labelCfg, error) {
 }
 
 func (l *label) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
-	if e == nil {
-		return fmt.Errorf("the event payload is empty")
-	}
 	if (*e.Action) != "comment" {
 		log.Debug("Event is not a creation of a comment, skipping.")
 		return nil
 	}
-	isPr := false
+	var action noteEventAction
 	switch *e.NoteableType {
 	case "PullRequest":
-		isPr = true
+		action = &PRNoteAction{event: e, client: l.ghc}
 	case "Issue":
-		isPr = false
+		action = &IssueNoteAction{event: e, client: l.ghc}
 	default:
 		log.Debug("not support note type")
 		return nil
 	}
-	var action noteEventAction
-	if isPr {
-		action = &PRNoteAction{event: e, client: l.ghc}
-	} else {
-		action = &IssueNoteAction{event: e, client: l.ghc}
-	}
+
 	return l.handleGenericCommentEvent(e, log, action)
 }
 
@@ -147,13 +137,15 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 	body := *e.Note
 	labelMatches := labelRegex.FindAllStringSubmatch(body, -1)
 	removeLabelMatches := removeLabelRegex.FindAllStringSubmatch(body, -1)
-	customLabelMatches := customLabelRegex.FindAllStringSubmatch(body, -1)
-	customRemoveLabelMatches := customRemoveLabelRegex.FindAllStringSubmatch(body, -1)
-	if len(labelMatches) == 0 && len(removeLabelMatches) == 0 && len(customLabelMatches) == 0 &&
-		len(customRemoveLabelMatches) == 0 {
+	if len(labelMatches) == 0 && len(removeLabelMatches) == 0 {
 		return nil
 	}
-	repoLabels, err := l.ghc.GetRepoLabels(e.Repository.Namespace, e.Repository.Path)
+
+	org,repo,err := plugins.GetOwnerAndRepoByEvent(e)
+	if err != nil {
+		return err
+	}
+	repoLabels, err := l.ghc.GetRepoLabels(org, repo)
 	if err != nil {
 		return err
 	}
@@ -161,38 +153,82 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 	if err != nil {
 		return err
 	}
-	RepoLabelsExisting := sets.String{}
+	repoLabelsExisting := sets.String{}
 	for _, l := range repoLabels {
-		RepoLabelsExisting.Insert(strings.ToLower(l.Name))
+		repoLabelsExisting.Insert(l.Name)
 	}
-	var (
-		nonexistent         []string
-		noSuchLabelsInRepo  []string
-		noSuchLabelsOnIssue []string
-		labelsToAdd         []string
-		labelsToRemove      []string
-	)
-	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
-	if err != nil {
-		return err
+	issueLabels := sets.String{}
+	for _, l := range labels {
+		issueLabels.Insert(l.Name)
 	}
-	var additionalLabels []string
-	if cfg, err := l.orgRepoCfg(org, repo); err == nil {
-		additionalLabels = append(additionalLabels, cfg.AdditionalLabels...)
-	} else {
-		log.Error(err)
+
+	//add labels
+	noSuchLabelsInRepo := addMatchLabels(labelMatches, issueLabels, repoLabelsExisting, action, log)
+	//remove labels
+	noSuchLabelsOnIssue := removeMatchLabels(removeLabelMatches, issueLabels, repoLabelsExisting, action, log)
+
+	return doMatchLabelsResult(action,noSuchLabelsOnIssue,noSuchLabelsInRepo,log)
+
+}
+
+func doMatchLabelsResult(action noteEventAction, noSuchIssueLabels, noSuchRepoLabels []string,log *logrus.Entry) error {
+	// Tried to add Labels that were not present on the repo
+	if len(noSuchRepoLabels) > 0 {
+		log.Infof("Labels missing in repo: %v", noSuchRepoLabels)
+		msg := fmt.Sprintf("The label(s) `%s` cannot be applied, because the repository doesn't have them",
+			strings.Join(noSuchRepoLabels, ", "))
+
+		return action.addComment(msg)
 	}
-	// Get labels to add and labels to remove from regexp matches
-	labelsToAdd = append(getLabelsFromREMatches(labelMatches), getLabelsFromGenericMatches(customLabelMatches, additionalLabels, &nonexistent)...)
-	labelsToRemove = append(getLabelsFromREMatches(removeLabelMatches), getLabelsFromGenericMatches(customRemoveLabelMatches, additionalLabels, &nonexistent)...)
+	// Tried to remove Labels that were not present on the Issue
+	if len(noSuchIssueLabels) > 0 {
+		msg := fmt.Sprintf("Those labels are not set: `%v`",
+			strings.Join(noSuchIssueLabels, ", "))
+
+		return action.addComment(msg)
+	}
+	return nil
+}
+
+func removeMatchLabels(match [][]string, labels, repoLabels sets.String, action noteEventAction, log *logrus.Entry) []string {
+	var noSuchLabelsOnIssue []string
+	if len(match) == 0 {
+		return noSuchLabelsOnIssue
+	}
+	labelsToRemove := getLabelsFromREMatches(match)
+
+	// Remove labels
+	for _, labelToRemove := range labelsToRemove {
+		if !labels.Has(labelToRemove) {
+			noSuchLabelsOnIssue = append(noSuchLabelsOnIssue, labelToRemove)
+			continue
+		}
+		if !repoLabels.Has(labelToRemove) {
+			continue
+		}
+		if err := action.removeLabel(labelToRemove); err != nil {
+			log.WithError(err).Errorf("Gitee failed to add the following label: %s", labelToRemove)
+		}
+	}
+	return noSuchLabelsOnIssue
+}
+
+func addMatchLabels(matches [][]string, labels, repoLabels sets.String, action noteEventAction, log *logrus.Entry) []string {
+	var noSuchLabelsInRepo []string
+	if len(matches) == 0 {
+		return noSuchLabelsInRepo
+	}
+
+	labelsToAdd := getLabelsFromREMatches(matches)
+
 	// Add labels
 	var canAddLabel []string
 	for _, labelToAdd := range labelsToAdd {
-		if plugins.HasLabel(labelToAdd, labels) {
+		if labels.Has(labelToAdd) {
 			continue
 		}
 
-		if !RepoLabelsExisting.Has(labelToAdd) {
+		if !repoLabels.Has(labelToAdd) {
 			noSuchLabelsInRepo = append(noSuchLabelsInRepo, labelToAdd)
 			continue
 		}
@@ -201,41 +237,7 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 	if err := action.addLabel(canAddLabel); err != nil {
 		log.WithError(err).Errorf("Gitee failed to add the following label: %s", strings.Join(canAddLabel, ","))
 	}
-	// Remove labels
-	for _, labelToRemove := range labelsToRemove {
-		if !plugins.HasLabel(labelToRemove, labels) {
-			noSuchLabelsOnIssue = append(noSuchLabelsOnIssue, labelToRemove)
-			continue
-		}
-		if !RepoLabelsExisting.Has(labelToRemove) {
-			continue
-		}
-		if err := action.removeLabel(labelToRemove); err != nil {
-			log.WithError(err).Errorf("Gitee failed to add the following label: %s", labelToRemove)
-		}
-	}
-	if len(nonexistent) > 0 {
-		log.Infof("Nonexistent labels: %v", nonexistent)
-		msg := fmt.Sprintf("The label(s) `%s` cannot be applied. These labels are supported: `%s`",
-			strings.Join(nonexistent, ", "), strings.Join(additionalLabels, ", "))
-
-		return action.addComment(msg)
-	}
-	if len(noSuchLabelsInRepo) > 0 {
-		log.Infof("Labels missing in repo: %v", noSuchLabelsInRepo)
-		msg := fmt.Sprintf("The label(s) `%s` cannot be applied, because the repository doesn't have them",
-			strings.Join(noSuchLabelsInRepo, ", "))
-
-		return action.addComment(msg)
-	}
-	// Tried to remove Labels that were not present on the Issue
-	if len(noSuchLabelsOnIssue) > 0 {
-		msg := fmt.Sprintf("Those labels are not set: `%v`",
-			strings.Join(noSuchLabelsOnIssue, ", "))
-
-		return action.addComment(msg)
-	}
-	return nil
+	return noSuchLabelsInRepo
 }
 
 func configString(labels []string) string {
@@ -254,34 +256,9 @@ func configString(labels []string) string {
 func getLabelsFromREMatches(matches [][]string) (labels []string) {
 	for _, match := range matches {
 		for _, label := range strings.Split(match[0], " ")[1:] {
-			label = strings.ToLower(match[1] + "/" + strings.TrimSpace(label))
+			label = match[1] + "/" + strings.TrimSpace(label)
 			labels = append(labels, label)
 		}
 	}
 	return
-}
-
-// getLabelsFromGenericMatches returns label matches with extra labels if those
-// have been configured in the plugin config.
-func getLabelsFromGenericMatches(matches [][]string, additionalLabels []string, invalidLabels *[]string) []string {
-	if len(additionalLabels) == 0 {
-		return nil
-	}
-	var labels []string
-	labelFilter := sets.String{}
-	for _, l := range additionalLabels {
-		labelFilter.Insert(strings.ToLower(l))
-	}
-	for _, match := range matches {
-		parts := strings.Split(strings.TrimSpace(match[0]), " ")
-		if ((parts[0] != "/label") && (parts[0] != "/remove-label")) || len(parts) != 2 {
-			continue
-		}
-		if labelFilter.Has(strings.ToLower(parts[1])) {
-			labels = append(labels, parts[1])
-		} else {
-			*invalidLabels = append(*invalidLabels, match[0])
-		}
-	}
-	return labels
 }
