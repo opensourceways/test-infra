@@ -7,7 +7,8 @@ import (
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/test-infra/prow/plugins"
+	plugins "k8s.io/test-infra/prow/gitee-plugins"
+	originp "k8s.io/test-infra/prow/plugins"
 )
 
 var closeRe = regexp.MustCompile(`(?mi)^/close\s*$`)
@@ -34,23 +35,26 @@ func closeIssue(gc closeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
 	if e.Issue.State != "open" {
 		return nil
 	}
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	number := e.Issue.Number
-	commentAuthor := e.Comment.User.Login
+	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
+	if err != nil {
+		return err
+	}
 
+	commentAuthor := e.Comment.User.Login
 	isAuthor := e.Issue.User.Login == commentAuthor
 
 	isCollaborator, err := gc.IsCollaborator(org, repo, commentAuthor)
 	if err != nil {
 		log.WithError(err).Errorf("Failed IsCollaborator(%s, %s, %s)", org, repo, commentAuthor)
 	}
+
+	number := e.Issue.Number
 	// Only authors and collaborators are allowed to close  issues.
 	if !isAuthor && !isCollaborator {
 		response := "You can't close an  issue unless you authored it or you are a collaborator."
 		log.Infof("Commenting \"%s\".", response)
 		return gc.CreateGiteeIssueComment(
-			org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
+			org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
 	}
 	if err := gc.CloseIssue(org, repo, number); err != nil {
 		return fmt.Errorf("error close issue:%v", err)
@@ -62,11 +66,11 @@ func closePullRequest(gc closeClient, log *logrus.Entry, e *sdk.NoteEvent) error
 	if e.PullRequest.State != "open" {
 		return nil
 	}
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	number := int(e.PullRequest.Number)
+	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
+	if err != nil {
+		return err
+	}
 	commentAuthor := e.Comment.User.Login
-
 	isAuthor := e.PullRequest.User.Login == commentAuthor
 
 	isCollaborator, err := gc.IsCollaborator(org, repo, commentAuthor)
@@ -74,16 +78,18 @@ func closePullRequest(gc closeClient, log *logrus.Entry, e *sdk.NoteEvent) error
 		log.WithError(err).Errorf("Failed IsCollaborator(%s, %s, %s)", org, repo, commentAuthor)
 	}
 
+	number := int(e.PullRequest.Number)
+
 	// Only authors and collaborators are allowed to close  PR.
 	if !isAuthor && !isCollaborator {
 		response := "You can't close an  PullRequest unless you authored it or you are a collaborator."
 		log.Infof("Commenting \"%s\".", response)
 		return gc.CreatePRComment(
-			org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
+			org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
 	}
 	if err := gc.ClosePR(org, repo, number); err != nil {
 		return fmt.Errorf("Error closing PR: %v ", err)
 	}
-	response := plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Closed this PR.")
+	response := originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Closed this PR.")
 	return gc.CreatePRComment(org, repo, number, response)
 }

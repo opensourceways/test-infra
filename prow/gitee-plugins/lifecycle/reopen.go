@@ -6,7 +6,8 @@ import (
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/test-infra/prow/plugins"
+	plugins "k8s.io/test-infra/prow/gitee-plugins"
+	originp "k8s.io/test-infra/prow/plugins"
 )
 
 var reopenRe = regexp.MustCompile(`(?mi)^/reopen\s*$`)
@@ -24,21 +25,25 @@ func handleReopen(gc reopenClient, log *logrus.Entry, e *sdk.NoteEvent) error {
 	if !reopenRe.MatchString(e.Comment.Body) {
 		return nil
 	}
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
-	number := e.Issue.Number
+	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
+	if err != nil {
+		return err
+	}
 	commentAuthor := e.Comment.User.Login
 	isAuthor := e.Issue.User.Login == commentAuthor
 	isCollaborator, err := gc.IsCollaborator(org, repo, commentAuthor)
 	if err != nil {
 		log.WithError(err).Errorf("Failed IsCollaborator(%s, %s, %s)", org, repo, commentAuthor)
 	}
+
+	number := e.Issue.Number
+
 	// Only authors and collaborators are allowed to reopen issues or PRs.
 	if !isAuthor && !isCollaborator {
 		response := "You can't reopen an issue/PR unless you authored it or you are a collaborator."
 		log.Infof("Commenting \"%s\".", response)
 		return gc.CreateGiteeIssueComment(
-			org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
+			org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
 	}
 	err = gc.ReopenIssue(org, repo, number)
 	if err != nil {
@@ -47,5 +52,5 @@ func handleReopen(gc reopenClient, log *logrus.Entry, e *sdk.NoteEvent) error {
 	// Add a comment after reopening the issue to leave an audit trail of who
 	// asked to reopen it.
 	return gc.CreateGiteeIssueComment(
-		org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Reopened this issue."))
+		org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Reopened this issue."))
 }
