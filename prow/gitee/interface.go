@@ -25,6 +25,7 @@ type Client interface {
 	AddPRLabel(org, repo string, number int, label string) error
 	RemovePRLabel(org, repo string, number int, label string) error
 
+	ClosePR(org, repo string, number int) error
 	AssignPR(owner, repo string, number int, logins []string) error
 	UnassignPR(owner, repo string, number int, logins []string) error
 	GetPRCommits(org, repo string, number int) ([]sdk.PullRequestCommits, error)
@@ -46,6 +47,10 @@ type Client interface {
 	AddMultiIssueLabel(org, repo, number string, label []string) error
 
 	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
+	CloseIssue(owner, repo string, number string) error
+	ReopenIssue(owner, repo string, number string) error
+	UpdateIssue(owner, number string, param sdk.IssueUpdateParam) (sdk.Issue, error)
+	GetIssueLabels(org, repo, number string) ([]sdk.Label, error)
 }
 
 type ListPullRequestOpt struct {
