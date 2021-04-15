@@ -198,7 +198,6 @@ func GetOwnerAndRepoByEvent(e interface{}) (string, string, error) {
 	}
 	org := repository.Namespace
 	repo := repository.Path
-
 	if org == "" || repo == "" {
 		return "", "", fmt.Errorf("owner or repo is empty")
 	}

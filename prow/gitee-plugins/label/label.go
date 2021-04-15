@@ -157,16 +157,14 @@ func (l *label) handleGenericCommentEvent(e *sdk.NoteEvent, log *logrus.Entry, a
 
 	issueLabels := labelsTransformMap(labels)
 
-	//add labels
-	noSuchLabelsInRepo := addMatchLabels(labelMatches, issueLabels, repoLabelsExisting, action, log)
 	//remove labels
 	removeMatchLabels(removeLabelMatches, issueLabels, action, log)
 
+	//add labels
+	noSuchLabelsInRepo := addMatchLabels(labelMatches, issueLabels, repoLabelsExisting, action, log)
 	if len(noSuchLabelsInRepo) > 0 {
-		log.Infof("Labels missing in repo: %v", noSuchLabelsInRepo)
-		msg := fmt.Sprintf("The label(s) `%s` cannot be applied, because the repository doesn't have them",
-			strings.Join(noSuchLabelsInRepo, ", "))
-
+		msg := fmt.Sprintf(
+			"The label(s) `%s` cannot be applied, because the repository doesn't have them", strings.Join(noSuchLabelsInRepo, ", "))
 		return action.addComment(msg)
 	}
 	return nil
@@ -180,18 +178,15 @@ func removeMatchLabels(match [][]string, labels map[string]string, action noteEv
 
 	// Remove labels
 	for _, labelToRemove := range labelsToRemove {
-		label, ok := labels[labelToRemove]
-		if !ok {
-			continue
-		}
-
-		if err := action.removeLabel(label); err != nil {
-			log.WithError(err).Errorf("Gitee failed to add the following label: %s", label)
+		if label, ok := labels[labelToRemove]; ok {
+			if err := action.removeLabel(label); err != nil {
+				log.WithError(err).Errorf("Gitee failed to add the following label: %s", label)
+			}
 		}
 	}
 }
 
-func addMatchLabels(matches [][]string, labels, repoLabels map[string]string, action noteEventAction, log *logrus.Entry) []string {
+func addMatchLabels(matches [][]string, currentLabels, repoLabels map[string]string, action noteEventAction, log *logrus.Entry) []string {
 	if len(matches) == 0 {
 		return nil
 	}
@@ -202,24 +197,23 @@ func addMatchLabels(matches [][]string, labels, repoLabels map[string]string, ac
 	// Add labels
 	var canAddLabel []string
 	for _, labelToAdd := range labelsToAdd {
-		if _, ok := labels[labelToAdd]; ok {
+		if _, ok := currentLabels[labelToAdd]; ok {
 			continue
 		}
 
-		label, ok := repoLabels[labelToAdd]
-		if !ok {
+		if label, ok := repoLabels[labelToAdd]; !ok {
 			noSuchLabelsInRepo = append(noSuchLabelsInRepo, labelToAdd)
-			continue
+		} else {
+			canAddLabel = append(canAddLabel, label)
 		}
-		canAddLabel = append(canAddLabel, label)
 	}
 
-	if len(canAddLabel) == 0 {
-		return noSuchLabelsInRepo
+	if len(canAddLabel) > 0 {
+		if err := action.addLabel(canAddLabel); err != nil {
+			log.WithError(err).Errorf("Gitee failed to add the following label: %s", strings.Join(canAddLabel, ","))
+		}
 	}
-	if err := action.addLabel(canAddLabel); err != nil {
-		log.WithError(err).Errorf("Gitee failed to add the following label: %s", strings.Join(canAddLabel, ","))
-	}
+
 	return noSuchLabelsInRepo
 }
 
