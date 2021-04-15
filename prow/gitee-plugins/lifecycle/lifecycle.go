@@ -33,13 +33,13 @@ func (l *lifecycle) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp
 		Featured:    false,
 		Description: "Closes an issue or PullRequest.",
 		Examples:    []string{"/close"},
-		WhoCanUse:   "Authors and collaborators on the repository can trigger this command.",
+		WhoCanUse:   "Authors and collaborators of the repository can trigger this command.",
 	})
 	pluginHelp.AddCommand(pluginhelp.Command{
 		Usage:       "/reopen",
 		Description: "Reopens an issue ",
 		Featured:    false,
-		WhoCanUse:   "Authors and collaborators on the repository can trigger this command.",
+		WhoCanUse:   "Authors and collaborators of the repository can trigger this command.",
 		Examples:    []string{"/reopen"},
 	})
 	return pluginHelp, nil
@@ -64,21 +64,34 @@ func (l *lifecycle) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
 	}()
 
-	eType := *(e.NoteableType)
-	if *(e.Action) != "comment" || (!isPr(eType) && eType != "Issue") {
+	if *(e.Action) != "comment" {
 		log.Debug("Event is not a creation of a comment for PR or issue, skipping.")
 		return nil
 	}
-	if err := handleReopen(l.gec, log, e); err != nil {
-		return err
+
+	eType := *(e.NoteableType)
+	if gitee.IsPullRequest(eType) {
+		if err := closePullRequest(l.gec, log, e); err != nil {
+			return err
+		}
 	}
-	if err := handleClose(l.gec, log, e); err != nil {
-		return err
+
+	if gitee.IsIssue(eType) {
+		if err := l.handleIssue(e, log); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func isPr(et string) bool {
-	return et == "PullRequest"
+func (l *lifecycle) handleIssue(e *sdk.NoteEvent, log *logrus.Entry) error {
+	if e.Issue.State == gitee.StatusClosed && reopenRe.MatchString(e.Comment.Body) {
+		return reopenIssue(l.gec, log, e)
+	}
+
+	if e.Issue.State == gitee.StatusOpen && closeRe.MatchString(e.Comment.Body) {
+		return closeIssue(l.gec, log, e)
+	}
+	return nil
 }

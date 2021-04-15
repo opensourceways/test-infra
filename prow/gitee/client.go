@@ -299,10 +299,10 @@ func (c *client) RemovePRLabel(org, repo string, number int, label string) error
 
 func (c *client) ClosePR(org, repo string, number int) error {
 	opt := sdk.PullRequestUpdateParam{
-		State:"closed",
+		State: "closed",
 	}
 	_, err := c.UpdatePullRequest(org, repo, int32(number), opt)
-	return formatErr(err,"close pr")
+	return formatErr(err, "close pr")
 }
 
 func (c *client) AssignPR(org, repo string, number int, logins []string) error {
@@ -448,11 +448,10 @@ func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []str
 	return formatErr(err, "replace pr labels")
 }
 
-
 func (c *client) CloseIssue(owner, repo string, number string) error {
 	opt := sdk.IssueUpdateParam{
 		Repo:  repo,
-		State: "closed",
+		State: StatusClosed,
 	}
 	_, err := c.UpdateIssue(owner, number, opt)
 	return formatErr(err, "close issue")
@@ -461,7 +460,7 @@ func (c *client) CloseIssue(owner, repo string, number string) error {
 func (c *client) ReopenIssue(owner, repo string, number string) error {
 	opt := sdk.IssueUpdateParam{
 		Repo:  repo,
-		State: "open",
+		State: IssueStatusOpen,
 	}
 	_, err := c.UpdateIssue(owner, number, opt)
 	return formatErr(err, "reopen issue")

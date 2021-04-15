@@ -357,5 +357,8 @@ func checkRepository(payload []byte, rep *gitee.ProjectHook) error {
 	if rep == nil {
 		return fmt.Errorf("event repository is empty,payload: %s", string(payload))
 	}
+	if rep.Namespace == "" || rep.Path == "" {
+		return fmt.Errorf("event repository namspace or path is empty:%s ", string(payload))
+	}
 	return nil
 }

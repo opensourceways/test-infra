@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"k8s.io/test-infra/prow/gitee"
 	"regexp"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -21,41 +22,18 @@ type closeClient interface {
 	ClosePR(owner, repo string, number int) error
 }
 
-func handleClose(gc closeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
-	if !closeRe.MatchString(e.Comment.Body) {
-		return nil
-	}
-	if isPr(*e.NoteableType) {
-		return closePullRequest(gc, log, e)
-	}
-	return closeIssue(gc, log, e)
-}
-
 func closeIssue(gc closeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
-	if e.Issue.State != "open" {
-		return nil
-	}
-	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
-	if err != nil {
-		return err
-	}
-
+	org, repo := plugins.GetOwnerAndRepoByEvent(e)
 	commentAuthor := e.Comment.User.Login
-	isAuthor := e.Issue.User.Login == commentAuthor
-
-	isCollaborator, err := gc.IsCollaborator(org, repo, commentAuthor)
-	if err != nil {
-		log.WithError(err).Errorf("Failed IsCollaborator(%s, %s, %s)", org, repo, commentAuthor)
-	}
-
+	author := e.Issue.User.Login
 	number := e.Issue.Number
-	// Only authors and collaborators are allowed to close  issues.
-	if !isAuthor && !isCollaborator {
+
+	if !isAuthorOrCollaborator(org, repo, author, commentAuthor, gc.IsCollaborator, log) {
 		response := "You can't close an  issue unless you authored it or you are a collaborator."
-		log.Infof("Commenting \"%s\".", response)
 		return gc.CreateGiteeIssueComment(
 			org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
 	}
+
 	if err := gc.CloseIssue(org, repo, number); err != nil {
 		return fmt.Errorf("error close issue:%v", err)
 	}
@@ -63,32 +41,37 @@ func closeIssue(gc closeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
 }
 
 func closePullRequest(gc closeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
-	if e.PullRequest.State != "open" {
+	if e.PullRequest.State != gitee.StatusOpen && closeRe.MatchString(e.Comment.Body) {
 		return nil
 	}
-	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
-	if err != nil {
-		return err
-	}
+	org, repo := plugins.GetOwnerAndRepoByEvent(e)
 	commentAuthor := e.Comment.User.Login
-	isAuthor := e.PullRequest.User.Login == commentAuthor
-
-	isCollaborator, err := gc.IsCollaborator(org, repo, commentAuthor)
-	if err != nil {
-		log.WithError(err).Errorf("Failed IsCollaborator(%s, %s, %s)", org, repo, commentAuthor)
-	}
-
+	author := e.PullRequest.User.Login
 	number := int(e.PullRequest.Number)
-	// Only authors and collaborators are allowed to close  PR.
-	if !isAuthor && !isCollaborator {
-		response := "You can't close an  PullRequest unless you authored it or you are a collaborator."
-		log.Infof("Commenting \"%s\".", response)
+
+	if !isAuthorOrCollaborator(org, repo, author, commentAuthor, gc.IsCollaborator, log) {
+		response := "You can't reopen an issue unless you are the author of it or a collaborator"
 		return gc.CreatePRComment(
 			org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
 	}
+
 	if err := gc.ClosePR(org, repo, number); err != nil {
 		return fmt.Errorf("Error closing PR: %v ", err)
 	}
+
 	response := originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Closed this PR.")
 	return gc.CreatePRComment(org, repo, number, response)
+}
+
+type collaboratorFunc func(string, string, string) (bool, error)
+
+func isAuthorOrCollaborator(org, repo, author, commenter string, isCollaboratorFunc collaboratorFunc, log *logrus.Entry) bool {
+	if author == commenter {
+		return true
+	}
+	isCollaborator, err := isCollaboratorFunc(org, repo, commenter)
+	if err != nil {
+		log.WithError(err).Errorf("Failed IsCollaborator(%s, %s, %s)", org, repo, commenter)
+	}
+	return isCollaborator
 }

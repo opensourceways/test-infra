@@ -18,34 +18,20 @@ type reopenClient interface {
 	ReopenIssue(owner, repo string, number string) error
 }
 
-func handleReopen(gc reopenClient, log *logrus.Entry, e *sdk.NoteEvent) error {
-	if isPr(*e.NoteableType) || e.Issue.State != "closed" {
-		return nil
-	}
-	if !reopenRe.MatchString(e.Comment.Body) {
-		return nil
-	}
-	org, repo, err := plugins.GetOwnerAndRepoByEvent(e)
-	if err != nil {
-		return err
-	}
-	commentAuthor := e.Comment.User.Login
-	isAuthor := e.Issue.User.Login == commentAuthor
-	isCollaborator, err := gc.IsCollaborator(org, repo, commentAuthor)
-	if err != nil {
-		log.WithError(err).Errorf("Failed IsCollaborator(%s, %s, %s)", org, repo, commentAuthor)
-	}
+func reopenIssue(gc reopenClient, log *logrus.Entry, e *sdk.NoteEvent) error {
 
+	org, repo := plugins.GetOwnerAndRepoByEvent(e)
+	commentAuthor := e.Comment.User.Login
+	author := e.Issue.User.Login
 	number := e.Issue.Number
-	// Only authors and collaborators are allowed to reopen issues or PRs.
-	if !isAuthor && !isCollaborator {
-		response := "You can't reopen an issue/PR unless you authored it or you are a collaborator."
-		log.Infof("Commenting \"%s\".", response)
+
+	if !isAuthorOrCollaborator(org,repo,author,commentAuthor,gc.IsCollaborator,log){
+		response := "You can't reopen an issue unless you are the author of it or a collaborator."
 		return gc.CreateGiteeIssueComment(
 			org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
 	}
-	err = gc.ReopenIssue(org, repo, number)
-	if err != nil {
+
+	if err := gc.ReopenIssue(org, repo, number); err != nil {
 		return err
 	}
 	// Add a comment after reopening the issue to leave an audit trail of who

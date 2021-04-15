@@ -1,7 +1,6 @@
 package plugins
 
 import (
-	"fmt"
 	"strings"
 
 	"gitee.com/openeuler/go-gitee/gitee"
@@ -168,7 +167,7 @@ func convertPullRequestLabel(e *gitee.PullRequestEvent) []github.Label {
 	return []github.Label{}
 }
 
-func GetOwnerAndRepoByEvent(e interface{}) (string, string, error) {
+func GetOwnerAndRepoByEvent(e interface{}) (string, string) {
 	var repository *gitee.ProjectHook
 	switch t := e.(type) {
 	case *gitee.PullRequestEvent:
@@ -180,17 +179,7 @@ func GetOwnerAndRepoByEvent(e interface{}) (string, string, error) {
 	case *gitee.IssueEvent:
 		repository = t.Repository
 	default:
-		return "", "", fmt.Errorf("not support event type")
+		return "", ""
 	}
-
-	if repository == nil {
-		return "", "", fmt.Errorf("no repository")
-	}
-	org := repository.Namespace
-	repo := repository.Path
-
-	if org == "" || repo == "" {
-		return "", "", fmt.Errorf("owner or repo is empty")
-	}
-	return org, repo, nil
+	return repository.Namespace, repository.Path
 }
