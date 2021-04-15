@@ -443,7 +443,7 @@ func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []str
 }
 
 func (c *client) CloseIssue(owner, repo string, number string) error {
-	opt := sdk.IssueUpdateParam{Repo:  repo,State: StatusClosed}
+	opt := sdk.IssueUpdateParam{Repo: repo, State: StatusClosed}
 	_, err := c.UpdateIssue(owner, number, opt)
 	return formatErr(err, "close issue")
 }
