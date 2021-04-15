@@ -6,8 +6,8 @@ import (
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 
-	plugins "k8s.io/test-infra/prow/gitee-plugins"
-	originp "k8s.io/test-infra/prow/plugins"
+	giteep "k8s.io/test-infra/prow/gitee-plugins"
+	"k8s.io/test-infra/prow/plugins"
 )
 
 var reopenRe = regexp.MustCompile(`(?mi)^/reopen\s*$`)
@@ -19,16 +19,15 @@ type reopenClient interface {
 }
 
 func reopenIssue(gc reopenClient, log *logrus.Entry, e *sdk.NoteEvent) error {
-
-	org, repo := plugins.GetOwnerAndRepoByEvent(e)
+	org, repo := giteep.GetOwnerAndRepoByEvent(e)
 	commentAuthor := e.Comment.User.Login
 	author := e.Issue.User.Login
 	number := e.Issue.Number
 
-	if !isAuthorOrCollaborator(org,repo,author,commentAuthor,gc.IsCollaborator,log){
+	if !isAuthorOrCollaborator(org, repo, author, commentAuthor, gc.IsCollaborator, log) {
 		response := "You can't reopen an issue unless you are the author of it or a collaborator."
 		return gc.CreateGiteeIssueComment(
-			org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
+			org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
 	}
 
 	if err := gc.ReopenIssue(org, repo, number); err != nil {
@@ -37,5 +36,5 @@ func reopenIssue(gc reopenClient, log *logrus.Entry, e *sdk.NoteEvent) error {
 	// Add a comment after reopening the issue to leave an audit trail of who
 	// asked to reopen it.
 	return gc.CreateGiteeIssueComment(
-		org, repo, number, originp.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Reopened this issue."))
+		org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Reopened this issue."))
 }

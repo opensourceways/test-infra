@@ -5,7 +5,6 @@ const (
 	StatusOpen = "open"
 	//StatusOpen gitee issue or pr status is closed
 	StatusClosed = "closed"
-
 )
 
 //IsPullRequest Determine whether it is a PullRequest
@@ -15,9 +14,5 @@ func IsPullRequest(noteType string) bool {
 
 //IsIssue Determine whether it is a issue
 func IsIssue(noteType string) bool {
-	return noteType == "issue"
+	return noteType == "Issue"
 }
-
-
-
-

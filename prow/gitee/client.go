@@ -298,16 +298,13 @@ func (c *client) RemovePRLabel(org, repo string, number int, label string) error
 }
 
 func (c *client) ClosePR(org, repo string, number int) error {
-	opt := sdk.PullRequestUpdateParam{
-		State: "closed",
-	}
+	opt := sdk.PullRequestUpdateParam{State: StatusClosed}
 	_, err := c.UpdatePullRequest(org, repo, int32(number), opt)
 	return formatErr(err, "close pr")
 }
 
 func (c *client) AssignPR(org, repo string, number int, logins []string) error {
 	opt := sdk.PullRequestAssigneePostParam{Assignees: strings.Join(logins, ",")}
-
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberAssignees(
 		context.Background(), org, repo, int32(number), opt)
 	return formatErr(err, "assign reviewer to pr")
@@ -326,10 +323,7 @@ func (c *client) GetPRCommits(org, repo string, number int) ([]sdk.PullRequestCo
 }
 
 func (c *client) AssignGiteeIssue(org, repo string, number string, login string) error {
-	opt := sdk.IssueUpdateParam{
-		Repo:     repo,
-		Assignee: login,
-	}
+	opt := sdk.IssueUpdateParam{Repo: repo, Assignee: login}
 	_, v, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(
 		context.Background(), org, number, opt)
 
@@ -449,19 +443,13 @@ func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []str
 }
 
 func (c *client) CloseIssue(owner, repo string, number string) error {
-	opt := sdk.IssueUpdateParam{
-		Repo:  repo,
-		State: StatusClosed,
-	}
+	opt := sdk.IssueUpdateParam{Repo:  repo,State: StatusClosed}
 	_, err := c.UpdateIssue(owner, number, opt)
 	return formatErr(err, "close issue")
 }
 
 func (c *client) ReopenIssue(owner, repo string, number string) error {
-	opt := sdk.IssueUpdateParam{
-		Repo:  repo,
-		State: IssueStatusOpen,
-	}
+	opt := sdk.IssueUpdateParam{Repo: repo, State: StatusOpen}
 	_, err := c.UpdateIssue(owner, number, opt)
 	return formatErr(err, "reopen issue")
 }

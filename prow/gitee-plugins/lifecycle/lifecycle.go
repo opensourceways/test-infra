@@ -6,9 +6,9 @@ import (
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 
-	prowConfig "k8s.io/test-infra/prow/config"
+	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/gitee"
-	plugins "k8s.io/test-infra/prow/gitee-plugins"
+	"k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/pluginhelp"
 )
 
@@ -24,7 +24,7 @@ func NewLifeCycle(f plugins.GetPluginConfig, gec gitee.Client) plugins.Plugin {
 	}
 }
 
-func (l *lifecycle) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
+func (l *lifecycle) HelpProvider(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
 	pluginHelp := &pluginhelp.PluginHelp{
 		Description: "Close an issue or PR",
 	}
