@@ -16,3 +16,8 @@ func IsPullRequest(noteType string) bool {
 func IsIssue(noteType string) bool {
 	return noteType == "Issue"
 }
+
+//IsCreateCommentEvent Determine whether an note event is create a comment
+func IsCreateCommentEvent(action string) bool {
+	return action == "comment"
+}

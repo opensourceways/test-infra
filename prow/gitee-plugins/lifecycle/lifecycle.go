@@ -64,7 +64,7 @@ func (l *lifecycle) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
 	}()
 
-	if *(e.Action) != "comment" {
+	if !gitee.IsCreateCommentEvent(*(e.Action)) {
 		log.Debug("Event is not a creation of a comment for PR or issue, skipping.")
 		return nil
 	}
