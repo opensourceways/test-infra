@@ -1,30 +1,21 @@
 package lifecycle
 
 import (
-	"regexp"
-
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 
+	"k8s.io/test-infra/prow/gitee"
 	giteep "k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/plugins"
 )
 
-var reopenRe = regexp.MustCompile(`(?mi)^/reopen\s*$`)
-
-type reopenClient interface {
-	IsCollaborator(owner, repo, login string) (bool, error)
-	CreateGiteeIssueComment(org, repo string, number string, comment string) error
-	ReopenIssue(owner, repo string, number string) error
-}
-
-func reopenIssue(gc reopenClient, log *logrus.Entry, e *sdk.NoteEvent) error {
+func reopenIssue(gc giteeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
 	org, repo := giteep.GetOwnerAndRepoByEvent(e)
-	commentAuthor := e.Comment.User.Login
-	author := e.Issue.User.Login
-	number := e.Issue.Number
+	ne := (*gitee.NoteEvent)(e)
+	commentAuthor := ne.GetCommenter()
+	number := ne.GetIssueNumber()
 
-	if !isAuthorOrCollaborator(org, repo, author, commentAuthor, gc.IsCollaborator, log) {
+	if !isAuthorOrCollaborator(org, repo, ne, gc, log) {
 		response := "You can't reopen an issue unless you are the author of it or a collaborator."
 		return gc.CreateGiteeIssueComment(
 			org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))

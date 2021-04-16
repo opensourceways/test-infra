@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"regexp"
 	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -12,9 +13,23 @@ import (
 	"k8s.io/test-infra/prow/pluginhelp"
 )
 
+var (
+	reopenRe = regexp.MustCompile(`(?mi)^/reopen\s*$`)
+	closeRe  = regexp.MustCompile(`(?mi)^/close\s*$`)
+)
+
+type giteeClient interface {
+	CreatePRComment(owner, repo string, number int, comment string) error
+	CreateGiteeIssueComment(owner, repo string, number string, comment string) error
+	IsCollaborator(owner, repo, login string) (bool, error)
+	CloseIssue(owner, repo string, number string) error
+	ClosePR(owner, repo string, number int) error
+	ReopenIssue(owner, repo string, number string) error
+}
+
 type lifecycle struct {
 	fGpc plugins.GetPluginConfig
-	gec  gitee.Client
+	gec  giteeClient
 }
 
 func NewLifeCycle(f plugins.GetPluginConfig, gec gitee.Client) plugins.Plugin {
@@ -64,33 +79,30 @@ func (l *lifecycle) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
 	}()
 
-	if !gitee.IsCreateCommentEvent(*(e.Action)) {
+	ne := (*gitee.NoteEvent)(e)
+	if !ne.IsCreateCommentEvent() {
 		log.Debug("Event is not a creation of a comment for PR or issue, skipping.")
 		return nil
 	}
 
-	eType := *(e.NoteableType)
-	if gitee.IsPullRequest(eType) {
-		if err := closePullRequest(l.gec, log, e); err != nil {
-			return err
-		}
+	if ne.IsPullRequest() {
+		return closePullRequest(l.gec, log, e)
 	}
 
-	if gitee.IsIssue(eType) {
-		if err := l.handleIssue(e, log); err != nil {
-			return err
-		}
+	if ne.IsIssue() {
+		return l.handleIssue(e, log)
 	}
 
 	return nil
 }
 
 func (l *lifecycle) handleIssue(e *sdk.NoteEvent, log *logrus.Entry) error {
-	if e.Issue.State == gitee.StatusClosed && reopenRe.MatchString(e.Comment.Body) {
+	ne := (*gitee.NoteEvent)(e)
+	if ne.IssueIsClosed() && reopenRe.MatchString(e.Comment.Body) {
 		return reopenIssue(l.gec, log, e)
 	}
 
-	if e.Issue.State == gitee.StatusOpen && closeRe.MatchString(e.Comment.Body) {
+	if ne.IssueIsOpen() && closeRe.MatchString(e.Comment.Body) {
 		return closeIssue(l.gec, log, e)
 	}
 	return nil
