@@ -15,7 +15,7 @@ type giteeClient interface {
 	CreatePRComment(owner, repo string, number int, comment string) error
 	AssignGiteeIssue(org, repo string, number string, login string) error
 	UnassignGiteeIssue(org, repo string, number string, login string) error
-	CreateGiteeIssueComment(owner, repo string, number string, comment string) error
+	CreateIssueComment(owner, repo string, number string, comment string) error
 }
 
 type ghclient struct {
@@ -114,7 +114,7 @@ func (c *ghclient) CreateComment(owner, repo string, number int, comment string)
 		return c.CreatePRComment(owner, repo, number, comment)
 	}
 
-	return c.CreateGiteeIssueComment(owner, repo, c.issueNumber(), comment)
+	return c.CreateIssueComment(owner, repo, c.issueNumber(), comment)
 }
 
 func (c *ghclient) RequestReview(org, repo string, number int, logins []string) error {

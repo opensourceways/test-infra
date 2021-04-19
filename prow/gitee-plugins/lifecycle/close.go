@@ -20,14 +20,14 @@ func closeIssue(gc giteeClient, log *logrus.Entry, ne gitee.IssueNoteEvent) erro
 			ne.NoteEventWrapper,
 			"You can't close an issue unless you are the author of it or a collaborator.",
 		)
-		return gc.CreateGiteeIssueComment(org, repo, number, resp)
+		return gc.CreateIssueComment(org, repo, number, resp)
 	}
 
 	if err := gc.CloseIssue(org, repo, number); err != nil {
 		return fmt.Errorf("error close issue:%v", err)
 	}
 
-	return gc.CreateGiteeIssueComment(
+	return gc.CreateIssueComment(
 		org, repo, number, response(ne.NoteEventWrapper, "Closed this issue."),
 	)
 }

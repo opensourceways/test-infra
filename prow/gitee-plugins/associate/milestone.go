@@ -16,7 +16,7 @@ const (
 var checkMilestoneRe = regexp.MustCompile(`(?mi)^/check-milestone\s*$`)
 
 type milestoneClient interface {
-	CreateGiteeIssueComment(org, repo string, number string, comment string) error
+	CreateIssueComment(org, repo string, number string, comment string) error
 	RemoveIssueLabel(org, repo, number, label string) error
 	AddIssueLabel(org, repo, number, label string) error
 }
@@ -58,5 +58,5 @@ func handleAddLabelAndComment(ghc milestoneClient, owner, repo, number, author s
 	if err != nil {
 		return err
 	}
-	return ghc.CreateGiteeIssueComment(owner, repo, number, fmt.Sprintf(unsetMilestoneComment, author))
+	return ghc.CreateIssueComment(owner, repo, number, fmt.Sprintf(unsetMilestoneComment, author))
 }

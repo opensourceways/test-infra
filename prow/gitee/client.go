@@ -339,7 +339,7 @@ func (c *client) UnassignGiteeIssue(org, repo string, number string, login strin
 	return c.AssignGiteeIssue(org, repo, number, " ")
 }
 
-func (c *client) CreateGiteeIssueComment(org, repo string, number string, comment string) error {
+func (c *client) CreateIssueComment(org, repo string, number string, comment string) error {
 	opt := sdk.IssueCommentPostParam{Body: comment}
 	_, _, err := c.ac.IssuesApi.PostV5ReposOwnerRepoIssuesNumberComments(
 		context.Background(), org, repo, number, opt)
@@ -381,11 +381,6 @@ func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, er
 
 	r.Commit.Tree.SHA = v.Commit.Tree.Sha
 	return r, nil
-}
-
-func (c *client) GetGiteeRepo(org, repo string) (sdk.Project, error) {
-	v, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepo(context.Background(), org, repo, nil)
-	return v, formatErr(err, "get repo")
 }
 
 func (c *client) MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error {

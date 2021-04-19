@@ -32,13 +32,12 @@ type Client interface {
 
 	AssignGiteeIssue(org, repo string, number string, login string) error
 	UnassignGiteeIssue(org, repo string, number string, login string) error
-	CreateGiteeIssueComment(org, repo string, number string, comment string) error
+	CreateIssueComment(org, repo string, number string, comment string) error
 
 	IsCollaborator(owner, repo, login string) (bool, error)
 	IsMember(org, login string) (bool, error)
 	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
 	GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error)
-	GetGiteeRepo(org, repo string) (sdk.Project, error)
 	MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error
 
 	GetRepos(org string) ([]sdk.Project, error)

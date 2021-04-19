@@ -20,7 +20,7 @@ var (
 
 type giteeClient interface {
 	CreatePRComment(owner, repo string, number int, comment string) error
-	CreateGiteeIssueComment(owner, repo string, number string, comment string) error
+	CreateIssueComment(owner, repo string, number string, comment string) error
 	IsCollaborator(owner, repo, login string) (bool, error)
 	CloseIssue(owner, repo string, number string) error
 	ClosePR(owner, repo string, number int) error
