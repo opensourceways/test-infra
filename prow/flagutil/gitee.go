@@ -12,7 +12,9 @@ import (
 
 // GiteeOptions holds options for interacting with Gitee.
 type GiteeOptions struct {
-	TokenPath string
+	TokenPath     string
+	RepoCacheDir  string
+	CacheRepoOnPV bool
 }
 
 // NewGiteeOptions creates a GiteeOptions with default values.
@@ -38,10 +40,15 @@ func (o *GiteeOptions) addFlags(wantDefaultGiteeTokenPath bool, fs *flag.FlagSet
 		defaultGiteeTokenPath = "/etc/gitee/oauth"
 	}
 	fs.StringVar(&o.TokenPath, "gitee-token-path", defaultGiteeTokenPath, "Path to the file containing the Gitee OAuth secret.")
+	fs.StringVar(&o.RepoCacheDir, "repo-cache-dir", "", "Path to which clone repo.")
+	fs.BoolVar(&o.CacheRepoOnPV, "cache-repo-on-pv", false, "Path to which clone repo.")
 }
 
 // Validate validates Gitee options.
 func (o *GiteeOptions) Validate(dryRun bool) error {
+	if o.CacheRepoOnPV && o.RepoCacheDir == "" {
+		return fmt.Errorf("must set repo-cache-dir if caching repo on persistent volume")
+	}
 	return nil
 }
 
@@ -86,8 +93,15 @@ func (o *GiteeOptions) GitClient(secretAgent *secret.Agent, dryRun bool) (git.Cl
 		opts.Token = f
 		opts.GitUser = userInfo
 		opts.Censor = secretAgent.Censor
+		if o.RepoCacheDir != "" {
+			opts.CacheDirBase = &o.RepoCacheDir
+		}
+	}
+	if o.CacheRepoOnPV {
+		return git.NewClientFactoryOnPV(setOpt)
 	}
 	return git.NewClientFactory(setOpt)
+
 }
 
 func token(tokenPath string, secretAgent *secret.Agent) (func() []byte, error) {

@@ -12,6 +12,7 @@ go_library(
         "adapter.go",
         "client_factory.go",
         "executor.go",
+        "export.go",
         "fakes.go",
         "interactor.go",
         "publisher.go",
