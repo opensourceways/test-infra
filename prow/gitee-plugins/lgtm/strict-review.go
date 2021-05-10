@@ -11,7 +11,7 @@ import (
 	"k8s.io/test-infra/prow/repoowners"
 )
 
-func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent) error {
+func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent, minReview int) error {
 	pr := e.PullRequest
 	org := pr.Base.Repo.Owner.Login
 	repo := pr.Base.Repo.Name
@@ -27,9 +27,9 @@ func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent) error {
 	switch e.Action {
 	case github.PullRequestActionOpened:
 		n = &notification{
-			treeHash: sha,
+			treeHash:  sha,
+			minReview: minReview,
 		}
-
 		filenames, err := originl.GetChangedFiles(gc, org, repo, prNumber)
 		if err != nil {
 			return err
@@ -48,6 +48,7 @@ func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent) error {
 		}
 
 		n = v
+		n.minReview = minReview
 		needRemoveLabel = true
 
 	default:
@@ -65,7 +66,7 @@ func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent) error {
 }
 
 // skipCollaborators && strictReviewer
-func HandleStrictLGTMComment(gc *ghclient, oc repoowners.Interface, log *logrus.Entry, wantLGTM bool, e *sdk.NoteEvent) error {
+func HandleStrictLGTMComment(gc *ghclient, oc repoowners.Interface, log *logrus.Entry, wantLGTM bool, e *sdk.NoteEvent, minReview int) error {
 	pr := e.PullRequest
 	s := &strictReview{
 		gc:  gc,
@@ -88,6 +89,7 @@ func HandleStrictLGTMComment(gc *ghclient, oc repoowners.Interface, log *logrus.
 	if err != nil {
 		return err
 	}
+	noti.minReview = minReview
 
 	validReviewers, err := s.fileReviewers()
 	if err != nil {
@@ -118,16 +120,16 @@ type strictReview struct {
 	prNumber int
 }
 
-func (this *strictReview) handleLGTMCancel(noti *notification, validReviewers map[string]sets.String, e *sdk.NoteEvent, hasLabel bool) error {
+func (sr *strictReview) handleLGTMCancel(noti *notification, validReviewers map[string]sets.String, e *sdk.NoteEvent, hasLabel bool) error {
 	commenter := e.Comment.User.Login
 
-	if commenter != this.prAuthor && !isReviewer(validReviewers, commenter) {
+	if commenter != sr.prAuthor && !isReviewer(validReviewers, commenter) {
 		noti.AddOpponent(commenter, false)
 
-		return this.writeComment(noti, hasLabel)
+		return sr.writeComment(noti, hasLabel)
 	}
 
-	if commenter == this.prAuthor {
+	if commenter == sr.prAuthor {
 		noti.ResetConsentor()
 		noti.ResetOpponents()
 	} else {
@@ -145,25 +147,25 @@ func (this *strictReview) handleLGTMCancel(noti *notification, validReviewers ma
 	}
 	noti.ResetDirs(genDirs(filenames))
 
-	err := this.writeComment(noti, false)
+	err := sr.writeComment(noti, false)
 	if err != nil {
 		return err
 	}
 
 	if hasLabel {
-		return this.removeLabel()
+		return sr.removeLabel()
 	}
 	return nil
 }
 
-func (this *strictReview) handleLGTM(noti *notification, validReviewers map[string]sets.String, e *sdk.NoteEvent, hasLabel bool) error {
+func (sr *strictReview) handleLGTM(noti *notification, validReviewers map[string]sets.String, e *sdk.NoteEvent, hasLabel bool) error {
 	comment := e.Comment
 	commenter := comment.User.Login
 
-	if commenter == this.prAuthor {
+	if commenter == sr.prAuthor {
 		resp := "you cannot LGTM your own PR."
-		return this.gc.CreateComment(
-			this.org, this.repo, this.prNumber,
+		return sr.gc.CreateComment(
+			sr.org, sr.repo, sr.prNumber,
 			plugins.FormatResponseRaw(comment.Body, comment.HtmlUrl, commenter, resp))
 	}
 
@@ -177,34 +179,34 @@ func (this *strictReview) handleLGTM(noti *notification, validReviewers map[stri
 	noti.AddConsentor(commenter, ok)
 
 	if !ok {
-		return this.writeComment(noti, hasLabel)
+		return sr.writeComment(noti, hasLabel)
 	}
 
 	resetReviewDir(validReviewers, noti)
 
 	ok = canAddLgtmLabel(noti)
-	if err := this.writeComment(noti, ok); err != nil {
+	if err := sr.writeComment(noti, ok); err != nil {
 		return err
 	}
 
 	if ok && !hasLabel {
-		return this.addLabel()
+		return sr.addLabel()
 	}
 
 	if !ok && hasLabel {
-		return this.removeLabel()
+		return sr.removeLabel()
 	}
 
 	return nil
 }
 
-func (this *strictReview) fileReviewers() (map[string]sets.String, error) {
-	ro, err := originl.LoadRepoOwners(this.gc, this.oc, this.org, this.repo, this.prNumber)
+func (sr *strictReview) fileReviewers() (map[string]sets.String, error) {
+	ro, err := originl.LoadRepoOwners(sr.gc, sr.oc, sr.org, sr.repo, sr.prNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	filenames, err := originl.GetChangedFiles(this.gc, this.org, this.repo, this.prNumber)
+	filenames, err := originl.GetChangedFiles(sr.gc, sr.org, sr.repo, sr.prNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -217,24 +219,24 @@ func (this *strictReview) fileReviewers() (map[string]sets.String, error) {
 	return m, nil
 }
 
-func (this *strictReview) writeComment(noti *notification, ok bool) error {
-	return noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, ok)
+func (sr *strictReview) writeComment(noti *notification, ok bool) error {
+	return noti.WriteComment(sr.gc, sr.org, sr.repo, sr.prNumber, ok)
 }
 
-func (this *strictReview) hasLGTMLabel() (bool, error) {
-	labels, err := this.gc.GetIssueLabels(this.org, this.repo, this.prNumber)
+func (sr *strictReview) hasLGTMLabel() (bool, error) {
+	labels, err := sr.gc.GetIssueLabels(sr.org, sr.repo, sr.prNumber)
 	if err != nil {
 		return false, err
 	}
 	return github.HasLabel(originl.LGTMLabel, labels), nil
 }
 
-func (this *strictReview) removeLabel() error {
-	return this.gc.RemoveLabel(this.org, this.repo, this.prNumber, originl.LGTMLabel)
+func (sr *strictReview) removeLabel() error {
+	return sr.gc.RemoveLabel(sr.org, sr.repo, sr.prNumber, originl.LGTMLabel)
 }
 
-func (this *strictReview) addLabel() error {
-	return this.gc.AddLabel(this.org, this.repo, this.prNumber, originl.LGTMLabel)
+func (sr *strictReview) addLabel() error {
+	return sr.gc.AddLabel(sr.org, sr.repo, sr.prNumber, originl.LGTMLabel)
 }
 
 func canAddLgtmLabel(noti *notification) bool {
@@ -244,9 +246,9 @@ func canAddLgtmLabel(noti *notification) bool {
 			return false
 		}
 	}
-
+	nrOk := noti.getValidReviewCount() >= noti.minReview
 	d := noti.GetDirs()
-	return d == nil || len(d) == 0
+	return len(d) == 0 && nrOk
 }
 
 func isReviewer(validReviewers map[string]sets.String, commenter string) bool {

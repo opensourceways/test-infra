@@ -17,8 +17,8 @@ const (
 )
 
 var (
-	notificationStr   = "LGTM NOTIFIER: This PR is %s.\n\nReviewers added `/lgtm` are: %s.\n\nReviewers added `/lgtm cancel` are: %s.\n\nIt still needs review for the codes in each of these directoris:%s\n<details>Git tree hash: %s</details>"
-	notificationStrRe = regexp.MustCompile(fmt.Sprintf(notificationStr, "(.*)", "(.*)", "(.*)", "([\\s\\S]*)", "(.*)"))
+	notificationStr   = "LGTM NOTIFIER: This PR is %s.\n\nReviewers added `/lgtm` are: %s.\n\nReviewers added `/lgtm cancel` are: %s.\n%s\nIt still needs review for the codes in each of these directoris:%s\n<details>Git tree hash: %s</details>"
+	notificationStrRe = regexp.MustCompile(fmt.Sprintf(notificationStr, "(.*)", "(.*)", "(.*)", "(.*)", "([\\s\\S]*)", "(.*)"))
 )
 
 type notification struct {
@@ -27,69 +27,86 @@ type notification struct {
 	dirs       []string
 	treeHash   string
 	commentID  int
+	minReview  int
 }
 
-func (this *notification) GetConsentors() map[string]bool {
-	return this.consentors
+func (notify *notification) GetConsentors() map[string]bool {
+	return notify.consentors
 }
 
-func (this *notification) GetOpponents() map[string]bool {
-	return this.opponents
+func (notify *notification) GetOpponents() map[string]bool {
+	return notify.opponents
 }
 
-func (this *notification) ResetConsentor() {
-	this.consentors = map[string]bool{}
+func (notify *notification) ResetConsentor() {
+	notify.consentors = map[string]bool{}
 }
 
-func (this *notification) ResetOpponents() {
-	this.opponents = map[string]bool{}
+func (notify *notification) ResetOpponents() {
+	notify.opponents = map[string]bool{}
 }
 
-func (this *notification) AddConsentor(consentor string, isReviewer bool) {
-	this.consentors[consentor] = isReviewer
-	if _, ok := this.opponents[consentor]; ok {
-		delete(this.opponents, consentor)
+func (notify *notification) AddConsentor(consentor string, isReviewer bool) {
+	notify.consentors[consentor] = isReviewer
+	if _, ok := notify.opponents[consentor]; ok {
+		delete(notify.opponents, consentor)
 	}
 }
 
-func (this *notification) AddOpponent(opponent string, isReviewer bool) {
-	this.opponents[opponent] = isReviewer
-	if _, ok := this.consentors[opponent]; ok {
-		delete(this.consentors, opponent)
+func (notify *notification) AddOpponent(opponent string, isReviewer bool) {
+	notify.opponents[opponent] = isReviewer
+	if _, ok := notify.consentors[opponent]; ok {
+		delete(notify.consentors, opponent)
 	}
 }
 
-func (this *notification) ResetDirs(s []string) {
-	this.dirs = s
+func (notify *notification) ResetDirs(s []string) {
+	notify.dirs = s
 }
 
-func (this *notification) GetDirs() []string {
-	return this.dirs
+func (notify *notification) GetDirs() []string {
+	return notify.dirs
 }
 
-func (this *notification) WriteComment(gc *ghclient, org, repo string, prNumber int, ok bool) error {
+func (notify *notification) WriteComment(gc *ghclient, org, repo string, prNumber int, ok bool) error {
 	r := consentientDesc
 	if !ok {
 		r = opposedDesc
 	}
 
 	s := ""
-	if this.dirs != nil && len(this.dirs) > 0 {
-		s = fmt.Sprintf("%s%s", dirSepa, strings.Join(this.dirs, dirSepa))
+	if notify.dirs != nil && len(notify.dirs) > 0 {
+		s = fmt.Sprintf("%s%s", dirSepa, strings.Join(notify.dirs, dirSepa))
+	}
+	mr := ""
+	sn := notify.minReview - notify.getValidReviewCount()
+	if sn > 0 && !ok {
+		mr = fmt.Sprintf("<br>It still needs %d reviewers to review.<br>", sn)
 	}
 
 	comment := fmt.Sprintf(
 		notificationStr, r,
-		reviewerToComment(this.consentors, separator),
-		reviewerToComment(this.opponents, separator),
+		reviewerToComment(notify.consentors, separator),
+		reviewerToComment(notify.opponents, separator),
+		mr,
 		s,
-		this.treeHash,
+		notify.treeHash,
 	)
 
-	if this.commentID == 0 {
+	if notify.commentID == 0 {
 		return gc.CreateComment(org, repo, prNumber, comment)
 	}
-	return gc.UpdatePRComment(org, repo, this.commentID, comment)
+	return gc.UpdatePRComment(org, repo, notify.commentID, comment)
+}
+
+func (notify *notification) getValidReviewCount() int {
+	count := 0
+	for _, v := range notify.consentors {
+		if v {
+			count++
+		}
+	}
+	return count
 }
 
 func LoadLGTMnotification(gc *ghclient, org, repo string, prNumber int, sha string) (*notification, bool, error) {
@@ -121,10 +138,10 @@ func LoadLGTMnotification(gc *ghclient, org, repo string, prNumber int, sha stri
 		if m != nil {
 			n.commentID = comment.ID
 
-			if m[5] == sha {
+			if m[6] == sha {
 				n.consentors = commentToReviewer(m[2], separator)
 				n.opponents = commentToReviewer(m[3], separator)
-				n.dirs = split(m[4], dirSepa)
+				n.dirs = split(m[5], dirSepa)
 
 				return n, false, nil
 			}
@@ -166,7 +183,7 @@ func commentToReviewer(s, sep string) map[string]bool {
 
 		for _, item := range a {
 			r := strings.Trim(item, "**")
-			m[r] = (item != r)
+			m[r] = item != r
 		}
 		return m
 	}

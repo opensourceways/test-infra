@@ -41,4 +41,6 @@ type pluginConfig struct {
 	originp.Lgtm
 
 	StrictReview bool `json:"strict_review,omitempty"`
+	//MinReviewers at least number of reviewers
+	MinReviewers int `json:"min_reviewers,omitempty"`
 }
