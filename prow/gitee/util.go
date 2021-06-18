@@ -1,6 +1,8 @@
 package gitee
 
 import (
+	"strconv"
+
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 )
 
@@ -20,4 +22,12 @@ func GetLabelFromEvent(labels []sdk.LabelHook) map[string]bool {
 		m[labels[i].Name] = true
 	}
 	return m
+}
+
+func stringToInt(num string) int {
+	rs, err := strconv.Atoi(num)
+	if err != nil {
+		return 0
+	}
+	return rs
 }

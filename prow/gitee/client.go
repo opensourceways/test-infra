@@ -199,7 +199,14 @@ func (c *client) GetPullRequestChanges(org, repo string, number int) ([]github.P
 	var r []github.PullRequestChange
 
 	for _, f := range fs {
-		r = append(r, github.PullRequestChange{Filename: f.Filename})
+		r = append(r, github.PullRequestChange{
+			Filename:  f.Filename,
+			SHA:       f.Sha,
+			Status:    f.Status,
+			Additions: stringToInt(f.Additions),
+			Deletions: stringToInt(f.Deletions),
+			BlobURL:   f.BlobUrl,
+		})
 	}
 	return r, nil
 }
@@ -493,6 +500,14 @@ func (c *client) UpdateIssue(owner, number string, param sdk.IssueUpdateParam) (
 func (c *client) GetIssueLabels(org, repo, number string) ([]sdk.Label, error) {
 	labels, _, err := c.ac.LabelsApi.GetV5ReposOwnerRepoIssuesNumberLabels(context.Background(), org, repo, number, nil)
 	return labels, formatErr(err, "get issue labels")
+}
+
+//GetPathContent Get the content under a specific repository
+func (c *client) GetPathContent(owner, repo, path, ref string) (sdk.Content, error) {
+	op := sdk.GetV5ReposOwnerRepoContentsPathOpts{}
+	op.Ref = optional.NewString(ref)
+	content, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoContentsPath(context.Background(), owner, repo, path, &op)
+	return content, formatErr(err, "get path content")
 }
 
 func formatErr(err error, doWhat string) error {

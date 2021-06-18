@@ -22,7 +22,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["size.go"],
+    srcs = [
+        "size.go",
+        "export.go",
+    ],
     importpath = "k8s.io/test-infra/prow/plugins/size",
     deps = [
         "//prow/config:go_default_library",
