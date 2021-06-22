@@ -236,3 +236,13 @@ func NormalEmail(email string) string {
 	}
 	return email
 }
+
+//HasLabel Determine whether the label is already in the label collection
+func HasLabel(label string, labels []sdk.Label) bool {
+	for _, lb := range labels {
+		if lb.Name == label {
+			return true
+		}
+	}
+	return false
+}

@@ -10,6 +10,7 @@ import (
 	"k8s.io/test-infra/prow/gitee-plugins/checkpr"
 	"k8s.io/test-infra/prow/gitee-plugins/cla"
 	claeuler "k8s.io/test-infra/prow/gitee-plugins/cla-euler"
+	"k8s.io/test-infra/prow/gitee-plugins/hold"
 	"k8s.io/test-infra/prow/gitee-plugins/label"
 	"k8s.io/test-infra/prow/gitee-plugins/lgtm"
 	"k8s.io/test-infra/prow/gitee-plugins/lifecycle"
@@ -44,6 +45,7 @@ func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.P
 	v = append(v, lifecycle.NewLifeCycle(gpc, cs.giteeClient))
 	v = append(v, label.NewLabel(gpc, cs.giteeClient))
 	v = append(v, reviewtrigger.NewPlugin(gpc, cs.giteeClient, botname, cs.ownersClient))
+	v = append(v, hold.NewHold(gpc, cs.giteeClient))
 
 	for _, i := range v {
 		name := i.PluginName()
