@@ -12,3 +12,4 @@ func HandleAssign(e github.GenericCommentEvent, gc githubClient, onAddFailure fu
 }
 
 var HelpProvider = helpProvider
+var ParseLogins = parseLogins

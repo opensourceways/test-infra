@@ -505,6 +505,11 @@ func (c *client) GetIssueLabels(org, repo, number string) ([]sdk.Label, error) {
 	return labels, formatErr(err, "get issue labels")
 }
 
+func (c *client) GetIssue(org, repo, number string) (sdk.Issue, error) {
+	issue, _, err := c.ac.IssuesApi.GetV5ReposOwnerRepoIssuesNumber(context.Background(), org, repo, number, nil)
+	return issue, formatErr(err, "get issue")
+}
+
 func formatErr(err error, doWhat string) error {
 	if err == nil {
 		return err
