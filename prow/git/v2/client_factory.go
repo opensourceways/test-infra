@@ -244,11 +244,13 @@ func (c *clientFactory) ClientFor(org, repo string) (RepoClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.masterLock.Lock()
 	if _, exists := c.repoLocks[cacheDir]; !exists {
-		c.repoLocks[cacheDir] = &sync.Mutex{}
+		c.masterLock.Lock()
+		if _, exists := c.repoLocks[cacheDir]; !exists {
+			c.repoLocks[cacheDir] = &sync.Mutex{}
+		}
+		c.masterLock.Unlock()
 	}
-	c.masterLock.Unlock()
 	c.repoLocks[cacheDir].Lock()
 	defer c.repoLocks[cacheDir].Unlock()
 	if _, err := os.Stat(path.Join(cacheDir, "HEAD")); os.IsNotExist(err) {

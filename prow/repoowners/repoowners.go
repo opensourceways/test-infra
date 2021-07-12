@@ -101,14 +101,15 @@ type cache struct {
 // getEntry returns the data for the key, a boolean indicating if data existed and a lock.
 // The lock is already locked, it must be unlocked by the caller.
 func (c *cache) getEntry(key string) (cacheEntry, bool, *sync.Mutex) {
-	c.lockMapLock.Lock()
-	entryLock, ok := c.lockMap[key]
-	if !ok {
-		c.lockMap[key] = &sync.Mutex{}
-		entryLock = c.lockMap[key]
+	if _, ok := c.lockMap[key]; !ok {
+		c.lockMapLock.Lock()
+		if _, ok = c.lockMap[key]; !ok {
+			c.lockMap[key] = &sync.Mutex{}
+		}
+		c.lockMapLock.Unlock()
 	}
-	c.lockMapLock.Unlock()
 
+	entryLock := c.lockMap[key]
 	entryLock.Lock()
 	c.dataLock.Lock()
 	defer c.dataLock.Unlock()
