@@ -3,8 +3,11 @@ package reviewtrigger
 import (
 	"fmt"
 	"math/rand"
+	"regexp"
 	"sort"
+	"strings"
 
+	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -102,6 +105,23 @@ func popRandom(set *sets.String) string {
 // findReviewer finds a reviewer from a set randomly.
 func findReviewer(targetSet *sets.String) string {
 	return popRandom(targetSet)
+}
+
+type reviewTips = approveTips
+
+func findReviewTips(comments []sdk.PullRequestComments, botName string) reviewTips {
+	reStr := strings.ReplaceAll(suggestComment, "( %s )", "\\( %s \\)")
+	reviewTipRe := regexp.MustCompile(fmt.Sprintf(reStr, "(.*)", "(.*)", "(.*)"))
+	for i := range comments {
+		tip := &comments[i]
+		if tip.User == nil || tip.User.Login != botName {
+			continue
+		}
+		if reviewTipRe.MatchString(tip.Body) {
+			return reviewTips{tipsID: int(tip.Id), body: tip.Body}
+		}
+	}
+	return reviewTips{}
 }
 
 type reviewersClient interface {

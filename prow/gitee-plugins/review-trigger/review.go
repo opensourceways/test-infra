@@ -22,6 +22,8 @@ const (
 	labelRequestChange = "request-change"
 )
 
+const suggestComment = "@%s, suggests these reviewers( %s ) to review your code. You can ask one of them by writing `@%s` in a comment"
+
 type trigger struct {
 	client          ghclient
 	botName         string
@@ -146,14 +148,13 @@ func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) err
 			errs.add(fmt.Sprintf("remove label when source code changed, err:%s", err.Error()))
 		}
 
-		if err := rt.suggestReviewers(e, log); err != nil {
-			errs.add(fmt.Sprintf("suggest reviewers, err: %s", err.Error()))
-		}
-
 		if err := rt.deleteTips(org, repo, prNumber); err != nil {
 			errs.add(fmt.Sprintf("delete tips, err:%s", err.Error()))
 		}
 
+		if err := rt.suggestReviewers(e, log); err != nil {
+			errs.add(fmt.Sprintf("suggest reviewers, err: %s", err.Error()))
+		}
 	}
 	return errs.err()
 }
@@ -225,10 +226,23 @@ func (rt *trigger) deleteTips(org, repo string, prNumber int) error {
 	if err != nil {
 		return err
 	}
-
-	tips := findApproveTips(comments, rt.botName)
+	var errStr []string
+	tips := findReviewTips(comments, rt.botName)
 	if tips.exists() {
-		return rt.client.DeletePRComment(org, repo, tips.tipsID)
+		if err = rt.client.DeletePRComment(org, repo, tips.tipsID); err != nil {
+			errStr = append(errStr, err.Error())
+		}
+	}
+
+	tips = findApproveTips(comments, rt.botName)
+	if tips.exists() {
+		if err := rt.client.DeletePRComment(org, repo, tips.tipsID); err != nil {
+			errStr = append(errStr, err.Error())
+		}
+	}
+
+	if len(errStr) > 0 {
+		return fmt.Errorf("delete comment occur err:%s", strings.Join(errStr, ","))
 	}
 	return nil
 }
@@ -283,9 +297,7 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 
 	rs := convertReviewers(reviewers)
 	return rt.client.CreatePRComment(
-		org, repo, sg.prNumber, fmt.Sprintf(
-			"@%s, suggests these reviewers( %s ) to review your code. You can ask one of them by writing `@%s` in a comment",
-			sg.prAuthor, strings.Join(rs, ", "), reviewers[0],
-		),
+		org, repo, sg.prNumber,
+		fmt.Sprintf(suggestComment, sg.prAuthor, strings.Join(rs, ", "), reviewers[0], ),
 	)
 }
