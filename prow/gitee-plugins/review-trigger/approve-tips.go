@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -124,32 +125,37 @@ func statOnesWhoDisagreed(reviewComments []*sComment) ([]string, []string) {
 	return rejecters.List(), reviewers.List()
 }
 
-func findApproveTips(allComments []sdk.PullRequestComments, botName string) botComment {
-	return findBotComment(allComments, botName, notificationRe)
-}
-
 type botComment struct {
 	commentID int
 	body      string
+	t         time.Time
 }
 
 func (c botComment) exists() bool {
 	return c.body != ""
 }
 
-func findBotComment(allComments []sdk.PullRequestComments, botName string, re *regexp.Regexp) botComment {
+func findBotComment(allComments []sdk.PullRequestComments, botName string, re *regexp.Regexp) []botComment {
+	r := []botComment{}
 	for i := range allComments {
 		item := &allComments[i]
 
 		if item.User == nil || item.User.Login != botName {
 			continue
 		}
+
 		if re.MatchString(item.Body) {
-			return botComment{
+			ut, err := time.Parse(time.RFC3339, item.UpdatedAt)
+			if err != nil {
+				// it is a invalid comment if parsing time failed
+				continue
+			}
+			r = append(r, botComment{
 				commentID: int(item.Id),
 				body:      item.Body,
-			}
+				t:         ut,
+			})
 		}
 	}
-	return botComment{}
+	return r
 }

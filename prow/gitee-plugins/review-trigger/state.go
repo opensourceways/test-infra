@@ -2,6 +2,7 @@ package reviewtrigger
 
 import (
 	"fmt"
+	"sort"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
@@ -50,17 +51,34 @@ func (rs reviewState) handle(isCIPassed bool, latestComment string) error {
 	return rs.applyLabel(label, validComments, comments, isCIPassed, latestComment)
 }
 
-func (rs reviewState) applyLabel(label string, reviewComments []*sComment, allComments []sdk.PullRequestComments, isCIPassed bool, latestComment string) error {
-	cls := rs.currentLabels
-	tips := findApproveTips(allComments, rs.botName)
+func (rs reviewState) applyLabel(
+	label string,
+	reviewComments []*sComment,
+	allComments []sdk.PullRequestComments,
+	isCIPassed bool,
+	latestComment string,
+) error {
+	oldComments := findBotComment(allComments, rs.botName, notificationRe)
+	for _, c := range oldComments {
+		rs.c.DeletePRComment(rs.org, rs.repo, c.commentID)
+	}
 
 	switch label {
 	case labelRequestChange:
-		return rs.applyRequestChange(cls, reviewComments, tips)
+		return rs.applyRequestChange(rs.currentLabels, reviewComments)
 	case labelLGTM:
-		return rs.applyLGTM(cls, reviewComments, isCIPassed, latestComment, tips)
+		tips := botComment{}
+		if n := len(oldComments); n > 0 {
+			if n > 1 {
+				sort.SliceStable(oldComments, func(i, j int) bool {
+					return oldComments[i].t.Before(oldComments[j].t)
+				})
+			}
+			tips = oldComments[n-1]
+		}
+		return rs.applyLGTM(rs.currentLabels, reviewComments, isCIPassed, latestComment, tips)
 	case labelApproved:
-		return rs.applyApproved(cls, reviewComments, tips)
+		return rs.applyApproved(rs.currentLabels, reviewComments)
 	}
 
 	return nil
@@ -80,52 +98,41 @@ func (rs reviewState) applyLGTM(cls map[string]bool, reviewComments []*sComment,
 	}
 
 	desc := lgtmTips(approvers, reviewers, sa, oldTips.body)
-	err = rs.writeApproveTips(desc, oldTips)
+	err = rs.writeApproveTips(desc)
 	errs.addError(err)
 
 	return errs.err()
 }
 
-func (rs reviewState) applyRequestChange(cls map[string]bool, reviewComments []*sComment, oldTips botComment) error {
+func (rs reviewState) applyRequestChange(cls map[string]bool, reviewComments []*sComment) error {
 	errs := newErrors()
 	err := rs.applyRequestChangeLabel(cls)
 	errs.addError(err)
 
 	rejecters, reviewers := statOnesWhoDisagreed(reviewComments)
-
-	desc := ""
 	if len(rejecters) == 0 {
-		desc = requestChangeTips(reviewers)
+		err = rs.writeApproveTips(requestChangeTips(reviewers))
 	} else {
-		desc = rejectTips(rejecters)
+		err = rs.writeApproveTips(rejectTips(rejecters))
 	}
-	err = rs.writeApproveTips(desc, oldTips)
 	errs.addError(err)
 
 	return errs.err()
 }
 
-func (rs reviewState) applyApproved(cls map[string]bool, reviewComments []*sComment, oldTips botComment) error {
+func (rs reviewState) applyApproved(cls map[string]bool, reviewComments []*sComment) error {
 	errs := newErrors()
 	err := rs.applyApprovedLabel(cls)
 	errs.addError(err)
 
 	approvers, _ := statOnesWhoAgreed(reviewComments)
-	err = rs.writeApproveTips(approvedTips(approvers), oldTips)
+	err = rs.writeApproveTips(approvedTips(approvers))
 	errs.addError(err)
 
 	return errs.err()
 }
 
-func (rs reviewState) writeApproveTips(desc string, oldTips botComment) error {
-	// can't check `if desc == oldTips.body` instead
-	if desc == "" || desc == oldTips.body {
-		return nil
-	}
-
-	if oldTips.exists() {
-		rs.c.DeletePRComment(rs.org, rs.repo, oldTips.commentID)
-	}
+func (rs reviewState) writeApproveTips(desc string) error {
 	return rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc)
 }
 

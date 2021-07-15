@@ -231,11 +231,11 @@ func (rt *trigger) deleteOldComments(org, repo string, prNumber int) error {
 		return err
 	}
 
-	if c := findApproveTips(comments, rt.botName); c.exists() {
+	for _, c := range findBotComment(comments, rt.botName, notificationRe) {
 		rt.client.DeletePRComment(org, repo, c.commentID)
 	}
 
-	if c := findBotComment(comments, rt.botName, prefixOfSuggestingReviewerRe); c.exists() {
+	for _, c := range findBotComment(comments, rt.botName, prefixOfSuggestingReviewerRe) {
 		rt.client.DeletePRComment(org, repo, c.commentID)
 	}
 
