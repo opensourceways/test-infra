@@ -68,36 +68,37 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		return nil
 	}
 
-	var n int32
-	isPR := true
-	if ew.IsPullRequest() {
-		n = ew.PullRequest.Number
-	} else if ew.IsIssue() {
-		isPR = false
-		a.handleAppointCollaborator(gitee.NewIssueNoteEvent(e), log)
-	} else {
+	if !ew.IsIssue() || !ew.IsPullRequest() {
 		log.Debug("not supported note type")
 		return nil
 	}
 
-	ce := github.GenericCommentEvent{
-		Repo: github.Repo{
-			Owner: github.User{Login: e.Repository.Namespace},
-			Name:  e.Repository.Path,
-		},
-		Body:    e.Comment.Body,
-		User:    github.User{Login: e.Comment.User.Login},
-		Number:  int(n),
-		HTMLURL: e.Comment.HtmlUrl,
-		IsPR:    isPR,
+	if ew.IsIssue() {
+		a.handleAppointCollaborator(gitee.NewIssueNoteEvent(e), log)
 	}
 
+	var n int32
 	var f func(mu github.MissingUsers) string
-	if isPR {
-		f = buildAssignPRFailureComment(a, ce.Repo.Owner.Login, ce.Repo.Name)
+	org, repo := ew.GetOrgRep()
+	if ew.IsPullRequest() {
+		f = buildAssignPRFailureComment(a, org, repo)
+		n = ew.PullRequest.Number
 	} else {
-		f = buildAssignIssueFailureComment(a, ce.Repo.Owner.Login, ce.Repo.Name)
+		f = buildAssignIssueFailureComment(a, org, repo)
 	}
+
+	ce := github.GenericCommentEvent{
+		Repo: github.Repo{
+			Owner: github.User{Login: org},
+			Name:  repo,
+		},
+		Body:    ew.GetComment(),
+		User:    github.User{Login: ew.GetCommenter()},
+		Number:  int(n),
+		HTMLURL: e.Comment.HtmlUrl,
+		IsPR:    ew.IsPullRequest(),
+	}
+
 	return origina.HandleAssign(ce, &ghclient{giteeClient: a.gec, e: e}, f, log)
 }
 
@@ -107,7 +108,27 @@ func (a *assign) handleAppointCollaborator(ew gitee.IssueNoteEvent, log *logrus.
 		return
 	}
 
-	toAdd, toRemove := parseActionCollaborators(ew.GetCommenter(), matches)
+	commenter := ew.GetCommenter()
+	var toAdd, toRemove []string
+	save := func(login string, isAdd bool) {
+		if isAdd {
+			toAdd = append(toAdd, login)
+		} else {
+			toRemove = append(toRemove, login)
+		}
+	}
+
+	for _, re := range matches {
+		add := re[1] == "add"
+		if re[2] == "" {
+			save(commenter, add)
+		} else {
+			for _, login := range origina.ParseLogins(re[2]) {
+				save(login, add)
+			}
+		}
+	}
+
 	org, repo := ew.GetOrgRep()
 	number := ew.GetIssueNumber()
 	needUpdates, missUser, err := a.filterCollaborators(org, repo, number, toAdd, toRemove)
@@ -115,18 +136,19 @@ func (a *assign) handleAppointCollaborator(ew gitee.IssueNoteEvent, log *logrus.
 		log.Error(err)
 		return
 	}
+
 	if len(missUser) > 0 {
 		comment := fmt.Sprintf(
-			"@%s gitee didn't allow you to [add|remove] collaborators, please check this users: **%s** are legitimate(must be an org/repo member or already assigner).",
-			ew.GetCommenter(),
+			"@%s: Gitee didn't allow you to [add|remove] the following collaborators which must be the member of repository or is already an issue collaborator or assigner. %s",
+			commenter,
 			strings.Join(missUser, ","),
 		)
 		if err = a.gec.CreateIssueComment(org, repo, number, comment); err != nil {
 			log.Error(err)
 		}
-		return
 	}
-	// adapter gitee api
+
+	// for gitee api "0" means empty collaborator
 	collaborator := "0"
 	if len(needUpdates) > 0 {
 		collaborator = strings.Join(needUpdates, ",")
@@ -150,23 +172,45 @@ func (a *assign) filterCollaborators(org, repo, number string, add, rm []string)
 	if err != nil {
 		return
 	}
+
 	addSet := sets.NewString(add...)
-	members := sets.NewString(getCollaborators(repoCB)...)
-	missAdd := addSet.Difference(members)
-	if issue.Assignee.Login != "" && addSet.Has(issue.Assignee.Login) {
-		missAdd.Insert(issue.Assignee.Login)
-	}
-	if missAdd.Len() > 0 {
-		miss = missAdd.List()
-		return
-	}
-	ccs := sets.NewString()
+	rmSet := sets.NewString(rm...)
+	repoMembers := sets.NewString(getCollaborators(repoCB)...)
+	issueCollaborators := sets.String{}
 	for _, v := range issue.Collaborators {
-		ccs.Insert(v.Login)
+		issueCollaborators.Insert(v.Login)
 	}
-	//delete outdated collaborators and merge collaborators that need to be added and removed
-	updates = ccs.Intersection(members).Insert(add...).Delete(rm...).List()
+
+	missAdd := filterMissUser(addSet, repoMembers)
+	missRm := filterMissUser(rmSet, issueCollaborators)
+	miss = missAdd.Union(missRm).List()
+
+	assigner := issue.Assignee.Login
+	if containAssign(assigner, addSet) {
+		miss = append(miss, assigner)
+	}
+
+	vAdd := validatedUser(addSet, missAdd)
+	vRm := validatedUser(rmSet, missRm)
+	vCurCbs := rmOutdatedCollaborators(repoMembers, issueCollaborators)
+	updates = vCurCbs.Union(vAdd).Difference(vRm).List()
 	return
+}
+
+func validatedUser(addSet sets.String, miss sets.String) sets.String {
+	return addSet.Difference(miss)
+}
+
+func filterMissUser(needFilters sets.String, members sets.String) sets.String {
+	return needFilters.Difference(members)
+}
+
+func containAssign(assign string, addSet sets.String) bool {
+	return assign != "" && addSet.Has(assign)
+}
+
+func rmOutdatedCollaborators(repoMembers sets.String, curCollaborators sets.String) sets.String {
+	return repoMembers.Intersection(curCollaborators)
 }
 
 func buildAssignPRFailureComment(a *assign, org, repo string) func(mu github.MissingUsers) string {
@@ -199,28 +243,6 @@ func buildAssignIssueFailureComment(a *assign, org, repo string) func(mu github.
 
 		return fmt.Sprintf("Gitee didn't allow you to assign to: %s.", mu.Users[0])
 	}
-}
-
-func parseActionCollaborators(commenter string, matches [][]string) (toAdd, toRemove []string) {
-	users := map[string]bool{}
-	for _, re := range matches {
-		add := re[1] == "add"
-		if re[2] == "" {
-			users[commenter] = add
-		} else {
-			for _, login := range origina.ParseLogins(re[2]) {
-				users[login] = add
-			}
-		}
-	}
-	for login, add := range users {
-		if add {
-			toAdd = append(toAdd, login)
-		} else {
-			toRemove = append(toRemove, login)
-		}
-	}
-	return
 }
 
 func getCollaborators(u []github.User) []string {
