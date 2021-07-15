@@ -2,6 +2,7 @@ package reviewtrigger
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -20,6 +21,11 @@ const (
 	labelLGTM          = "lgtm"
 	labelApproved      = "approved"
 	labelRequestChange = "request-change"
+)
+
+var (
+	prefixOfSuggestingReviewer   = "@%s, suggests these reviewers( %s ) to review your code."
+	prefixOfSuggestingReviewerRe = regexp.MustCompile("@(.*), suggests these reviewers\\( (.*) \\) to review your code")
 )
 
 type trigger struct {
@@ -146,14 +152,13 @@ func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) err
 			errs.add(fmt.Sprintf("remove label when source code changed, err:%s", err.Error()))
 		}
 
-		if err := rt.suggestReviewers(e, log); err != nil {
-			errs.add(fmt.Sprintf("suggest reviewers, err: %s", err.Error()))
-		}
-
-		if err := rt.deleteTips(org, repo, prNumber); err != nil {
+		if err := rt.deleteOldComments(org, repo, prNumber); err != nil {
 			errs.add(fmt.Sprintf("delete tips, err:%s", err.Error()))
 		}
 
+		if err := rt.suggestReviewers(e, log); err != nil {
+			errs.add(fmt.Sprintf("suggest reviewers, err: %s", err.Error()))
+		}
 	}
 	return errs.err()
 }
@@ -220,16 +225,20 @@ func (rt *trigger) removeInvalidLabels(e *sdk.PullRequestEvent, canReview bool) 
 	return errs.err()
 }
 
-func (rt *trigger) deleteTips(org, repo string, prNumber int) error {
+func (rt *trigger) deleteOldComments(org, repo string, prNumber int) error {
 	comments, err := rt.client.ListPRComments(org, repo, prNumber)
 	if err != nil {
 		return err
 	}
 
-	tips := findApproveTips(comments, rt.botName)
-	if tips.exists() {
-		return rt.client.DeletePRComment(org, repo, tips.tipsID)
+	if tips := findApproveTips(comments, rt.botName); tips.exists() {
+		rt.client.DeletePRComment(org, repo, tips.tipsID)
 	}
+
+	if c := findBotComment(comments, rt.botName, prefixOfSuggestingReviewerRe); c.exists() {
+		rt.client.DeletePRComment(org, repo, c.commentID)
+	}
+
 	return nil
 }
 
@@ -284,7 +293,7 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 	rs := convertReviewers(reviewers)
 	return rt.client.CreatePRComment(
 		org, repo, sg.prNumber, fmt.Sprintf(
-			"@%s, suggests these reviewers( %s ) to review your code. You can ask one of them by writing `@%s` in a comment",
+			prefixOfSuggestingReviewer+" You can ask one of them by writing `@%s` in a comment",
 			sg.prAuthor, strings.Join(rs, ", "), reviewers[0],
 		),
 	)

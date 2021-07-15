@@ -148,3 +148,29 @@ func findApproveTips(allComments []sdk.PullRequestComments, botName string) appr
 	}
 	return approveTips{}
 }
+
+type botComment struct {
+	commentID int
+	body      string
+}
+
+func (c botComment) exists() bool {
+	return c.body != ""
+}
+
+func findBotComment(allComments []sdk.PullRequestComments, botName string, re *regexp.Regexp) botComment {
+	for i := range allComments {
+		item := &allComments[i]
+
+		if item.User == nil || item.User.Login != botName {
+			continue
+		}
+		if re.MatchString(item.Body) {
+			return botComment{
+				commentID: int(item.Id),
+				body:      item.Body,
+			}
+		}
+	}
+	return botComment{}
+}
