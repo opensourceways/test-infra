@@ -124,29 +124,8 @@ func statOnesWhoDisagreed(reviewComments []*sComment) ([]string, []string) {
 	return rejecters.List(), reviewers.List()
 }
 
-type approveTips struct {
-	tipsID int
-	body   string
-}
-
-func (a approveTips) exists() bool {
-	return a.body != ""
-}
-
-func findApproveTips(allComments []sdk.PullRequestComments, botName string) approveTips {
-	for i := range allComments {
-		tips := &allComments[i]
-		if tips.User == nil || tips.User.Login != botName {
-			continue
-		}
-		if notificationRe.MatchString(tips.Body) {
-			return approveTips{
-				tipsID: int(tips.Id),
-				body:   tips.Body,
-			}
-		}
-	}
-	return approveTips{}
+func findApproveTips(allComments []sdk.PullRequestComments, botName string) botComment {
+	return findBotComment(allComments, botName, notificationRe)
 }
 
 type botComment struct {

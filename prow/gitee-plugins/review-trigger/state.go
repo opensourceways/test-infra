@@ -66,7 +66,7 @@ func (rs reviewState) applyLabel(label string, reviewComments []*sComment, allCo
 	return nil
 }
 
-func (rs reviewState) applyLGTM(cls map[string]bool, reviewComments []*sComment, isCIPassed bool, latestComment string, oldTips approveTips) error {
+func (rs reviewState) applyLGTM(cls map[string]bool, reviewComments []*sComment, isCIPassed bool, latestComment string, oldTips botComment) error {
 	errs := newErrors()
 	err := rs.applyLGTMLabel(cls)
 	errs.addError(err)
@@ -86,7 +86,7 @@ func (rs reviewState) applyLGTM(cls map[string]bool, reviewComments []*sComment,
 	return errs.err()
 }
 
-func (rs reviewState) applyRequestChange(cls map[string]bool, reviewComments []*sComment, oldTips approveTips) error {
+func (rs reviewState) applyRequestChange(cls map[string]bool, reviewComments []*sComment, oldTips botComment) error {
 	errs := newErrors()
 	err := rs.applyRequestChangeLabel(cls)
 	errs.addError(err)
@@ -105,7 +105,7 @@ func (rs reviewState) applyRequestChange(cls map[string]bool, reviewComments []*
 	return errs.err()
 }
 
-func (rs reviewState) applyApproved(cls map[string]bool, reviewComments []*sComment, oldTips approveTips) error {
+func (rs reviewState) applyApproved(cls map[string]bool, reviewComments []*sComment, oldTips botComment) error {
 	errs := newErrors()
 	err := rs.applyApprovedLabel(cls)
 	errs.addError(err)
@@ -117,14 +117,14 @@ func (rs reviewState) applyApproved(cls map[string]bool, reviewComments []*sComm
 	return errs.err()
 }
 
-func (rs reviewState) writeApproveTips(desc string, oldTips approveTips) error {
+func (rs reviewState) writeApproveTips(desc string, oldTips botComment) error {
 	// can't check `if desc == oldTips.body` instead
 	if desc == "" || desc == oldTips.body {
 		return nil
 	}
 
 	if oldTips.exists() {
-		rs.c.DeletePRComment(rs.org, rs.repo, oldTips.tipsID)
+		rs.c.DeletePRComment(rs.org, rs.repo, oldTips.commentID)
 	}
 	return rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc)
 }
