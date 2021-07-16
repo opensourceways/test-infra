@@ -131,17 +131,17 @@ func (a *assign) handleAppointCollaborator(ew gitee.IssueNoteEvent, log *logrus.
 
 	org, repo := ew.GetOrgRep()
 	number := ew.GetIssueNumber()
-	needUpdates, missUser, err := a.filterCollaborators(org, repo, number, toAdd, toRemove)
+	result, miss, err := a.buildCollaborators(org, repo, number, toAdd, toRemove)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	if len(missUser) > 0 {
+	if len(miss) > 0 {
 		comment := fmt.Sprintf(
-			"@%s: Gitee didn't allow you to [add|remove] the following collaborators which must be the member of repository or is already an issue collaborator or assigner. %s",
+			"@%s: gitee didn't allow you to add or remove collaborators with the following reasons: \n %s",
 			commenter,
-			strings.Join(missUser, ","),
+			strings.Join(miss, "\n"),
 		)
 		if err = a.gec.CreateIssueComment(org, repo, number, comment); err != nil {
 			log.Error(err)
@@ -150,8 +150,8 @@ func (a *assign) handleAppointCollaborator(ew gitee.IssueNoteEvent, log *logrus.
 
 	// for gitee api "0" means empty collaborator
 	collaborator := "0"
-	if len(needUpdates) > 0 {
-		collaborator = strings.Join(needUpdates, ",")
+	if len(result) > 0 {
+		collaborator = strings.Join(result, ",")
 	}
 	param := sdk.IssueUpdateParam{
 		Repo:          repo,
@@ -163,63 +163,66 @@ func (a *assign) handleAppointCollaborator(ew gitee.IssueNoteEvent, log *logrus.
 	}
 }
 
-func (a *assign) filterCollaborators(org, repo, number string, add, rm []string) (updates, miss []string, err error) {
+func (a *assign) buildCollaborators(org, repo, number string, add, rm []string) (result, miss []string, err error) {
 	issue, err := a.gec.GetIssue(org, repo, number)
 	if err != nil {
 		return
 	}
-	repoCB, err := a.gec.ListCollaborators(org, repo)
-	if err != nil {
+
+	repoMembers := sets.NewString()
+	if v, err1 := a.getCollaborators(org, repo); err1 == nil {
+		repoMembers.Insert(v...)
+	} else {
+		err = err1
 		return
 	}
 
-	addSet := sets.NewString(add...)
-	rmSet := sets.NewString(rm...)
-	repoMembers := sets.NewString(getCollaborators(repoCB)...)
+	toAdd := sets.NewString(add...)
+	if v := issue.Assignee.Login; toAdd.Has(v) {
+		miss = append(miss, fmt.Sprintf("The assignee( %s ) can not be collaborator at same time.", v))
+		toAdd.Delete(v)
+	}
+
+	if v := toAdd.Difference(repoMembers); len(v) > 0 {
+		miss = append(miss, fmt.Sprintf("These persons( %s ) are not allowed to be added as collaborator which must be the member of repository.", strings.Join(v.List(), ", ")))
+		toAdd = toAdd.Difference(v)
+	}
+
+	current := sets.NewString()
+	for _, v := range issue.Collaborators {
+		current.Insert(v.Login)
+	}
+	toRemove := sets.NewString(rm...)
+	if v := toRemove.Difference(current); len(v) > 0 {
+		miss = append(miss, fmt.Sprintf("These persons( %s ) are not in the current collaborators and no need to be removed again.", strings.Join(v.List(), ", ")))
+	}
+
 	issueCollaborators := sets.String{}
 	for _, v := range issue.Collaborators {
 		issueCollaborators.Insert(v.Login)
 	}
 
-	missAdd := filterMissUser(addSet, repoMembers)
-	missRm := filterMissUser(rmSet, issueCollaborators)
-	assigner := issue.Assignee.Login
-	if containAssign(assigner, addSet) {
-		missAdd.Insert(assigner)
-	}
-	miss = missAdd.Union(missRm).List()
-
-	vAdd := validatedUser(addSet, missAdd)
-	vRm := validatedUser(rmSet, missRm)
-	vCurCbs := rmOutdatedCollaborators(repoMembers, issueCollaborators)
-	updates = vCurCbs.Union(vAdd).Difference(vRm).List()
+	result = current.Intersection(repoMembers).Difference(toRemove).Union(toAdd).List()
 	return
 }
 
-func validatedUser(addSet sets.String, miss sets.String) sets.String {
-	return addSet.Difference(miss)
-}
-
-func filterMissUser(needFilters sets.String, members sets.String) sets.String {
-	return needFilters.Difference(members)
-}
-
-func containAssign(assign string, addSet sets.String) bool {
-	return assign != "" && addSet.Has(assign)
-}
-
-func rmOutdatedCollaborators(repoMembers sets.String, curCollaborators sets.String) sets.String {
-	return repoMembers.Intersection(curCollaborators)
+func (a *assign) getCollaborators(org, repo string) ([]string, error) {
+	repoCB, err := a.gec.ListCollaborators(org, repo)
+	if err != nil {
+		return nil, err
+	}
+	r := make([]string, len(repoCB))
+	for i, item := range repoCB {
+		r[i] = item.Login
+	}
+	return r, nil
 }
 
 func buildAssignPRFailureComment(a *assign, org, repo string) func(mu github.MissingUsers) string {
 
 	return func(mu github.MissingUsers) string {
-		v, err := a.gec.ListCollaborators(org, repo)
-		if err == nil {
-			v1 := getCollaborators(v)
-
-			return fmt.Sprintf("Gitee didn't allow you to assign to: %s.\n\nChoose following members as assignees.\n- %s", strings.Join(mu.Users, ", "), strings.Join(v1, "\n- "))
+		if v, err := a.getCollaborators(org, repo); err == nil {
+			return fmt.Sprintf("Gitee didn't allow you to assign to: %s.\n\nChoose following members as assignees.\n- %s", strings.Join(mu.Users, ", "), strings.Join(v, "\n- "))
 		}
 
 		return fmt.Sprintf("Gitee didn't allow you to assign to: %s.", strings.Join(mu.Users, ", "))
@@ -233,21 +236,10 @@ func buildAssignIssueFailureComment(a *assign, org, repo string) func(mu github.
 			return "Can only assign one person to an issue."
 		}
 
-		v, err := a.gec.ListCollaborators(org, repo)
-		if err == nil {
-			v1 := getCollaborators(v)
-
-			return fmt.Sprintf("Gitee didn't allow you to assign to: %s.\n\nChoose one of following members as assignee.\n- %s", mu.Users[0], strings.Join(v1, "\n- "))
+		if v, err := a.getCollaborators(org, repo); err == nil {
+			return fmt.Sprintf("Gitee didn't allow you to assign to: %s.\n\nChoose one of following members as assignee.\n- %s", mu.Users[0], strings.Join(v, "\n- "))
 		}
 
 		return fmt.Sprintf("Gitee didn't allow you to assign to: %s.", mu.Users[0])
 	}
-}
-
-func getCollaborators(u []github.User) []string {
-	r := make([]string, len(u))
-	for i, item := range u {
-		r[i] = item.Login
-	}
-	return r
 }
