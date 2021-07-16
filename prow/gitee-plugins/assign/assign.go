@@ -38,7 +38,7 @@ func (a *assign) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, e
 		Usage:       "/[add|rm]-collaborator [[@]<username>...]",
 		Description: "Assigns collaborator(s) to the issue",
 		Featured:    true,
-		WhoCanUse:   "Anyone can use the command, but the target user(s) must be an org member, a repo collaborator, or should have previously commented on the issue.",
+		WhoCanUse:   "Anyone can use the command, but the target user(s) must be the repo's member.",
 		Examples:    []string{"/add-collaborator", "/rm-collaborator", "/add-collaborator @spongebob", "/add-collaborator spongebob patrick"},
 	})
 	return ph, nil
@@ -138,11 +138,7 @@ func (a *assign) handleAppointCollaborator(ew gitee.IssueNoteEvent, log *logrus.
 	}
 
 	if len(miss) > 0 {
-		comment := fmt.Sprintf(
-			"@%s: gitee didn't allow you to add or remove collaborators with the following reasons: \n %s",
-			commenter,
-			strings.Join(miss, "\n"),
-		)
+		comment := fmt.Sprintf("@%s:\n%s", commenter, strings.Join(miss, "\n"))
 		if err = a.gec.CreateIssueComment(org, repo, number, comment); err != nil {
 			log.Error(err)
 		}
@@ -183,7 +179,7 @@ func (a *assign) buildCollaborators(org, repo, number string, add, rm []string) 
 		toAdd.Delete(v)
 	}
 
-	if v := toAdd.Difference(repoMembers); len(v) > 0 {
+	if v := toAdd.Difference(repoMembers); v.Len() > 0 {
 		miss = append(miss, fmt.Sprintf("These persons( %s ) are not allowed to be added as collaborator which must be the member of repository.", strings.Join(v.List(), ", ")))
 		toAdd = toAdd.Difference(v)
 	}
@@ -193,13 +189,8 @@ func (a *assign) buildCollaborators(org, repo, number string, add, rm []string) 
 		current.Insert(v.Login)
 	}
 	toRemove := sets.NewString(rm...)
-	if v := toRemove.Difference(current); len(v) > 0 {
+	if v := toRemove.Difference(current); v.Len() > 0 {
 		miss = append(miss, fmt.Sprintf("These persons( %s ) are not in the current collaborators and no need to be removed again.", strings.Join(v.List(), ", ")))
-	}
-
-	issueCollaborators := sets.String{}
-	for _, v := range issue.Collaborators {
-		issueCollaborators.Insert(v.Login)
 	}
 
 	result = current.Intersection(repoMembers).Difference(toRemove).Union(toAdd).List()
