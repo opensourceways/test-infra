@@ -16,6 +16,8 @@ type giteeClient interface {
 	AssignGiteeIssue(org, repo string, number string, login string) error
 	UnassignGiteeIssue(org, repo string, number string, login string) error
 	CreateIssueComment(owner, repo string, number string, comment string) error
+	GetIssue(org, repo, number string) (sdk.Issue, error)
+	UpdateIssue(owner, number string, param sdk.IssueUpdateParam) (sdk.Issue, error)
 }
 
 type ghclient struct {

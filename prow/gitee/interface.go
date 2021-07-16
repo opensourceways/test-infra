@@ -54,6 +54,7 @@ type Client interface {
 	ReopenIssue(owner, repo string, number string) error
 	UpdateIssue(owner, number string, param sdk.IssueUpdateParam) (sdk.Issue, error)
 	GetIssueLabels(org, repo, number string) ([]sdk.Label, error)
+	GetIssue(org, repo, number string) (sdk.Issue, error)
 
 	ListPROperationLogs(org, repo string, number int) ([]sdk.OperateLog, error)
 }
