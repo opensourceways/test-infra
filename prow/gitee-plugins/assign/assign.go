@@ -68,7 +68,7 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		return nil
 	}
 
-	if !ew.IsIssue() || !ew.IsPullRequest() {
+	if !ew.IsIssue() && !ew.IsPullRequest() {
 		log.Debug("not supported note type")
 		return nil
 	}
@@ -183,12 +183,11 @@ func (a *assign) filterCollaborators(org, repo, number string, add, rm []string)
 
 	missAdd := filterMissUser(addSet, repoMembers)
 	missRm := filterMissUser(rmSet, issueCollaborators)
-	miss = missAdd.Union(missRm).List()
-
 	assigner := issue.Assignee.Login
 	if containAssign(assigner, addSet) {
-		miss = append(miss, assigner)
+		missAdd.Insert(assigner)
 	}
+	miss = missAdd.Union(missRm).List()
 
 	vAdd := validatedUser(addSet, missAdd)
 	vRm := validatedUser(rmSet, missRm)
