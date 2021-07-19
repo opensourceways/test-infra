@@ -37,13 +37,13 @@ func (c *configuration) TideFor(org, repo string) *pluginConfig {
 	index := -1
 	for i := range c.Tide {
 		item := &(c.Tide[i])
+		applyOrgRepo, applyOrg := item.canApply(org, fullName)
 
-		s := sets.NewString(item.Repos...)
-		if s.Has(fullName) {
-			return item
-		}
+		if applyOrgRepo {
+			if !applyOrg {
+				return item
 
-		if s.Has(org) {
+			}
 			index = i
 		}
 	}
@@ -59,6 +59,9 @@ type pluginConfig struct {
 	// Repos is either of the form org/repos or just org.
 	Repos []string `json:"repos" required:"true"`
 
+	// ExcludedRepos is in the form org/repo.
+	ExcludedRepos []string `json:"excluded_repos,omitempty"`
+
 	// MergeMethod is the method to merge PR.
 	// The default method of merge. Valid options are squash, rebase, and merge.
 	MergeMethod github.PullRequestMergeType `json:"merge_method,omitempty"`
@@ -68,6 +71,32 @@ type pluginConfig struct {
 
 	// MissingLabels specifies the ones which a PR must not have to be merged.
 	MissingLabels []string `json:"missing_labels,omitempty"`
+}
+
+// The return value will be one of the following cases:
+// true,  false: the config can be applied to the org/repo
+// true,  true:  the config can be applied to the org and org/repo
+// false, true:  the config can be applied to the org excepot org/repo
+// false, false: the config can be applied to neither org or org/repo
+func (p *pluginConfig) canApply(org, orgRepo string) (applyOrgRepo bool, applyOrg bool) {
+	v := sets.NewString(p.Repos...)
+	if v.Has(orgRepo) {
+		applyOrgRepo = true
+		return
+	}
+
+	if !v.Has(org) {
+		return
+	}
+
+	applyOrg = true
+
+	if len(p.ExcludedRepos) > 0 && sets.NewString(p.ExcludedRepos...).HasAny(orgRepo) {
+		return
+	}
+
+	applyOrgRepo = true
+	return
 }
 
 func (p *pluginConfig) setDefault() {
@@ -80,6 +109,11 @@ func (p pluginConfig) validate() error {
 	if p.MergeMethod != github.MergeMerge && p.MergeMethod != github.MergeSquash {
 		return fmt.Errorf("unsupported merge method:%s", p.MergeMethod)
 	}
+
+	if sets.NewString(p.Repos...).HasAny(p.ExcludedRepos...) {
+		return fmt.Errorf("some org or org/repo exists in both repos and excluded_repos")
+	}
+
 	return nil
 }
 
