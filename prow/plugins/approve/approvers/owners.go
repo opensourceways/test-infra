@@ -65,7 +65,7 @@ func (o Owners) GetApprovers() map[string]sets.String {
 	ownersToApprovers := map[string]sets.String{}
 
 	for fn := range o.GetOwnersSet() {
-		ownersToApprovers[fn] = o.repo.Approvers(fn)
+		ownersToApprovers[fn] = o.repo.Approvers(filepath.Join(fn, ownersFileName))
 	}
 
 	return ownersToApprovers
@@ -76,7 +76,7 @@ func (o Owners) GetLeafApprovers() map[string]sets.String {
 	ownersToApprovers := map[string]sets.String{}
 
 	for fn := range o.GetOwnersSet() {
-		ownersToApprovers[fn] = o.repo.LeafApprovers(fn)
+		ownersToApprovers[fn] = o.repo.LeafApprovers(filepath.Join(fn, ownersFileName))
 	}
 
 	return ownersToApprovers
