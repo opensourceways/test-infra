@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -124,27 +125,37 @@ func statOnesWhoDisagreed(reviewComments []*sComment) ([]string, []string) {
 	return rejecters.List(), reviewers.List()
 }
 
-type approveTips struct {
-	tipsID int
-	body   string
+type botComment struct {
+	commentID int
+	body      string
+	t         time.Time
 }
 
-func (a approveTips) exists() bool {
-	return a.body != ""
+func (c botComment) exists() bool {
+	return c.body != ""
 }
 
-func findApproveTips(allComments []sdk.PullRequestComments, botName string) approveTips {
+func findBotComment(allComments []sdk.PullRequestComments, botName string, re *regexp.Regexp) []botComment {
+	r := []botComment{}
 	for i := range allComments {
-		tips := &allComments[i]
-		if tips.User == nil || tips.User.Login != botName {
+		item := &allComments[i]
+
+		if item.User == nil || item.User.Login != botName {
 			continue
 		}
-		if notificationRe.MatchString(tips.Body) {
-			return approveTips{
-				tipsID: int(tips.Id),
-				body:   tips.Body,
+
+		if re.MatchString(item.Body) {
+			ut, err := time.Parse(time.RFC3339, item.UpdatedAt)
+			if err != nil {
+				// it is a invalid comment if parsing time failed
+				continue
 			}
+			r = append(r, botComment{
+				commentID: int(item.Id),
+				body:      item.Body,
+				t:         ut,
+			})
 		}
 	}
-	return approveTips{}
+	return r
 }
