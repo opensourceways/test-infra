@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 
@@ -235,4 +236,39 @@ func NormalEmail(email string) string {
 		return v[0]
 	}
 	return email
+}
+
+type BotComment struct {
+	CommentID int
+	Body      string
+	CreatedAt time.Time
+}
+
+func (c BotComment) Exists() bool {
+	return c.Body != ""
+}
+
+func FindBotComment(allComments []sdk.PullRequestComments, botName string, re *regexp.Regexp) []BotComment {
+	r := []BotComment{}
+	for i := range allComments {
+		item := &allComments[i]
+
+		if item.User == nil || item.User.Login != botName {
+			continue
+		}
+
+		if re.MatchString(item.Body) {
+			ut, err := time.Parse(time.RFC3339, item.UpdatedAt)
+			if err != nil {
+				// it is a invalid comment if parsing time failed
+				continue
+			}
+			r = append(r, BotComment{
+				CommentID: int(item.Id),
+				Body:      item.Body,
+				CreatedAt: ut,
+			})
+		}
+	}
+	return r
 }
